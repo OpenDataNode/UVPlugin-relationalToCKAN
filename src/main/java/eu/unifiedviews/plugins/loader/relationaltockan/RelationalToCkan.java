@@ -69,6 +69,16 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
 
     public static final String PROXY_API_DATA = "data";
 
+    public static final String CKAN_DATASTORE_RESOURCE_ID = "resource_id";
+
+    public static final String CKAN_DATASTORE_FIELDS = "fields";
+
+    public static final String CKAN_DATASTORE_RECORDS = "records";
+
+    public static final String CKAN_DATASTORE_PRIMARY_KEY = "primary_key";
+
+    public static final String CKAN_DATASTORE_INDEXES = "indexes";
+
     private Messages messages;
 
     private DPUContext context;

@@ -16,6 +16,7 @@ import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonBuilderFactory;
+import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -132,6 +133,32 @@ public class RelationalToCkanHelper {
         }
     }
 
+    public static JsonObject buildDataStoreParameters(String resourceId, List<String> indexes, List<String> primaryKeys, JsonArray fields, JsonArray records) {
+        JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
+        JsonObjectBuilder dataStoreBuilder = factory.createObjectBuilder();
+        dataStoreBuilder.add(RelationalToCkan.CKAN_DATASTORE_RESOURCE_ID, resourceId)
+                .add(RelationalToCkan.CKAN_DATASTORE_FIELDS, fields)
+                .add(RelationalToCkan.CKAN_DATASTORE_RECORDS, records);
+
+        if (primaryKeys != null && !primaryKeys.isEmpty()) {
+            JsonArrayBuilder primaryKeysArray = factory.createArrayBuilder();
+            for (String key : primaryKeys) {
+                primaryKeysArray.add(key);
+            }
+            dataStoreBuilder.add(RelationalToCkan.CKAN_DATASTORE_PRIMARY_KEY, primaryKeysArray);
+        }
+
+        if (indexes != null && !indexes.isEmpty()) {
+            JsonArrayBuilder indexesArray = factory.createArrayBuilder();
+            for (String index : indexes) {
+                indexesArray.add(index);
+            }
+            dataStoreBuilder.add(RelationalToCkan.CKAN_DATASTORE_INDEXES, indexesArray);
+        }
+
+        return dataStoreBuilder.build();
+    }
+
     public static JsonArray buildFieldsDefinitionJson(List<ColumnDefinition> columns) {
         JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
         JsonArrayBuilder fieldsBuilder = factory.createArrayBuilder();
@@ -139,7 +166,7 @@ public class RelationalToCkanHelper {
         for (ColumnDefinition column : columns) {
             fieldsBuilder.add(factory.createObjectBuilder()
                     .add("id", column.getColumnName())
-                    .add("type", column.getColumnType()));
+                    .add("type", column.getColumnTypeName()));
         }
 
         return fieldsBuilder.build();
@@ -151,79 +178,75 @@ public class RelationalToCkanHelper {
         while (rs.next()) {
             JsonObjectBuilder entryBuilder = factory.createObjectBuilder();
             for (ColumnDefinition column : columns) {
-                if (rs.getObject(column.getColumnName()) == null) {
-                    entryBuilder.addNull(column.getColumnName());
-                } else {
-                    switch (column.getColumnType()) {
-                        case Types.INTEGER:
-                            entryBuilder.add(column.getColumnName(), rs.getInt(column.getColumnName()));
-                            break;
-                        case Types.BIGINT:
-                            entryBuilder.add(column.getColumnName(), rs.getLong(column.getColumnName()));
-                            break;
+                switch (column.getColumnType()) {
+                    case Types.INTEGER:
+                        entryBuilder.add(column.getColumnName(), rs.getInt(column.getColumnName()));
+                        break;
+                    case Types.BIGINT:
+                        entryBuilder.add(column.getColumnName(), rs.getLong(column.getColumnName()));
+                        break;
 
-                        case Types.DECIMAL:
-                        case Types.NUMERIC:
-                            entryBuilder.add(column.getColumnName(), rs.getBigDecimal(column.getColumnName()));
-                            break;
+                    case Types.DECIMAL:
+                    case Types.NUMERIC:
+                        entryBuilder.add(column.getColumnName(), rs.getBigDecimal(column.getColumnName()));
+                        break;
 
-                        case Types.FLOAT:
-                        case Types.REAL:
-                        case Types.DOUBLE:
-                            entryBuilder.add(column.getColumnName(), rs.getDouble(column.getColumnName()));
-                            break;
+                    case Types.FLOAT:
+                    case Types.REAL:
+                    case Types.DOUBLE:
+                        entryBuilder.add(column.getColumnName(), rs.getDouble(column.getColumnName()));
+                        break;
 
-                        case Types.NVARCHAR:
-                        case Types.VARCHAR:
-                        case Types.LONGNVARCHAR:
-                        case Types.LONGVARCHAR:
-                            entryBuilder.add(column.getColumnName(), rs.getString(column.getColumnName()));
-                            break;
+                    case Types.NVARCHAR:
+                    case Types.VARCHAR:
+                    case Types.LONGNVARCHAR:
+                    case Types.LONGVARCHAR:
+                        entryBuilder.add(column.getColumnName(), rs.getString(column.getColumnName()));
+                        break;
 
-                        case Types.BOOLEAN:
-                        case Types.BIT:
-                            entryBuilder.add(column.getColumnName(), rs.getBoolean(column.getColumnName()));
-                            break;
+                    case Types.BOOLEAN:
+                    case Types.BIT:
+                        entryBuilder.add(column.getColumnName(), rs.getBoolean(column.getColumnName()));
+                        break;
 
-                        case Types.TINYINT:
-                        case Types.SMALLINT:
-                            entryBuilder.add(column.getColumnName(), rs.getShort(column.getColumnName()));
-                            break;
+                    case Types.TINYINT:
+                    case Types.SMALLINT:
+                        entryBuilder.add(column.getColumnName(), rs.getShort(column.getColumnName()));
+                        break;
 
-                        case Types.DATE:
-                            entryBuilder.add(column.getColumnName(), rs.getDate(column.getColumnName()).toString());
-                            break;
+                    case Types.DATE:
+                        entryBuilder.add(column.getColumnName(), rs.getDate(column.getColumnName()).toString());
+                        break;
 
-                        case Types.TIMESTAMP:
-                            entryBuilder.add(column.getColumnName(), rs.getTime(column.getColumnName()).toString());
-                            break;
+                    case Types.TIMESTAMP:
+                        entryBuilder.add(column.getColumnName(), rs.getTime(column.getColumnName()).toString());
+                        break;
 
-                        case Types.ARRAY:
-                            entryBuilder.add(column.getColumnName(), getArrayAsString(rs.getArray(column.getColumnName())));
-                            break;
+                    case Types.ARRAY:
+                        entryBuilder.add(column.getColumnName(), getSqlArrayAsJsonArray(factory, rs.getArray(column.getColumnName())));
+                        break;
 
-                        case Types.BLOB:
-                        case Types.CLOB:
-                            // TODO: implement BLOB/CLOB conversion
-                            entryBuilder.addNull(column.getColumnName());
-                            break;
+                    case Types.BLOB:
+                    case Types.CLOB:
+                        // TODO: implement BLOB/CLOB conversion
+                        entryBuilder.addNull(column.getColumnName());
+                        break;
 
-                        case Types.BINARY:
-                        case Types.VARBINARY:
-                        case Types.LONGVARBINARY:
-                            //TODO: implement binary formats conversion
-                            entryBuilder.addNull(column.getColumnName());
-                            break;
+                    case Types.BINARY:
+                    case Types.VARBINARY:
+                    case Types.LONGVARBINARY:
+                        //TODO: implement binary formats conversion
+                        entryBuilder.addNull(column.getColumnName());
+                        break;
 
-                        case Types.STRUCT:
-                        case Types.DISTINCT:
-                        case Types.REF:
-                        case Types.JAVA_OBJECT:
-                        default:
-                            // TODO: which of these to implement?
-                            entryBuilder.addNull(column.getColumnName());
-                            break;
-                    }
+                    case Types.STRUCT:
+                    case Types.DISTINCT:
+                    case Types.REF:
+                    case Types.JAVA_OBJECT:
+                    default:
+                        // TODO: which of these to implement?
+                        entryBuilder.addNull(column.getColumnName());
+                        break;
                 }
             }
             recordsBuilder.add(entryBuilder);
@@ -232,16 +255,14 @@ public class RelationalToCkanHelper {
         return recordsBuilder.build();
     }
 
-    private static String getArrayAsString(Array array) throws SQLException {
-        StringBuilder sb = new StringBuilder();
+    private static JsonArrayBuilder getSqlArrayAsJsonArray(JsonBuilderFactory factory, Array array) throws SQLException {
+        JsonArrayBuilder jsonArray = factory.createArrayBuilder();
         ResultSet rs = array.getResultSet();
         while (rs.next()) {
-            sb.append(rs.getObject(2));
-            sb.append(",");
+            jsonArray.add(rs.getObject(2).toString());
         }
-        sb.setLength(sb.length() - 1);
 
-        return sb.toString();
+        return jsonArray;
 
     }
 
