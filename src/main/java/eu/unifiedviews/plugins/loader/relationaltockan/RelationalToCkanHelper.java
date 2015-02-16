@@ -67,6 +67,25 @@ public class RelationalToCkanHelper {
         return columnIndexes;
     }
 
+    public static List<String> getTablePrimaryKeys(Connection conn, String tableName) throws SQLException {
+        List<String> primaryKeys = new ArrayList<>();
+        ResultSet keys = null;
+        try {
+            DatabaseMetaData meta = conn.getMetaData();
+            keys = meta.getPrimaryKeys(null, null, tableName);
+            while (keys.next()) {
+                String primaryKeyColumn = keys.getString("COLUMN_NAME");
+                if (primaryKeyColumn != null) {
+                    primaryKeys.add(primaryKeyColumn);
+                }
+            }
+        } finally {
+            tryCloseResultSet(keys);
+        }
+
+        return primaryKeys;
+    }
+
     public static void tryCloseDbResources(Connection conn, Statement stmnt, ResultSet rs) {
         tryCloseResultSet(rs);
         tryCloseStatement(stmnt);
@@ -133,7 +152,7 @@ public class RelationalToCkanHelper {
         }
     }
 
-    public static JsonObject buildDataStoreParameters(String resourceId, List<String> indexes, List<String> primaryKeys, JsonArray fields, JsonArray records) {
+    public static JsonObject buildCreateDataStoreParameters(String resourceId, List<String> indexes, List<String> primaryKeys, JsonArray fields, JsonArray records) {
         JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
         JsonObjectBuilder dataStoreBuilder = factory.createObjectBuilder();
         dataStoreBuilder.add(RelationalToCkan.CKAN_DATASTORE_RESOURCE_ID, resourceId)
@@ -155,6 +174,14 @@ public class RelationalToCkanHelper {
             }
             dataStoreBuilder.add(RelationalToCkan.CKAN_DATASTORE_INDEXES, indexesArray);
         }
+
+        return dataStoreBuilder.build();
+    }
+
+    public static JsonObject buildDeleteDataStoreParamters(String resourceId) {
+        JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
+        JsonObjectBuilder dataStoreBuilder = factory.createObjectBuilder();
+        dataStoreBuilder.add(RelationalToCkan.CKAN_DATASTORE_RESOURCE_ID, resourceId);
 
         return dataStoreBuilder.build();
     }
@@ -263,17 +290,11 @@ public class RelationalToCkanHelper {
         }
 
         return jsonArray;
-
     }
 
     public static void main(String[] args) {
-        ColumnDefinition def1 = new ColumnDefinition("id", "integer", 12);
-        ColumnDefinition def2 = new ColumnDefinition("name", "varchar", 11);
-        List<ColumnDefinition> defs = new ArrayList<>();
-        defs.add(def1);
-        defs.add(def2);
-        JsonArray array = buildFieldsDefinitionJson(defs);
-        System.out.println(array.toString());
-    }
+        String resourceId = "aaa-123-456";
+        System.out.println(buildDeleteDataStoreParamters(resourceId));
 
+    }
 }

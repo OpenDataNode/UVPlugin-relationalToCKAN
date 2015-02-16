@@ -51,7 +51,7 @@ public class RelationalToCkanConfig_V1 {
         this.bOverwriteTables = overwrite;
     }
 
-    public boolean getOverWriteTables() {
+    public boolean isOverWriteTables() {
         return this.bOverwriteTables;
     }
 

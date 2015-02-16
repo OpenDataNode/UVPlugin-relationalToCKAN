@@ -2,9 +2,14 @@ package eu.unifiedviews.plugins.loader.relationaltockan;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import javax.json.Json;
@@ -65,6 +70,10 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
 
     public static final String CKAN_API_RESOURCE_CREATE = "resource_create";
 
+    public static final String CKAN_API_DATASTORE_CREATE = "datastore_create";
+
+    public static final String CKAN_API_DATASTORE_DELETE = "datastore_delete";
+
     public static final String PROXY_API_STORAGE_ID = "storage_id";
 
     public static final String PROXY_API_DATA = "data";
@@ -95,7 +104,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         this.context = context;
         this.messages = new Messages(this.context.getLocale(), this.getClass().getClassLoader());
 
-        String shortMessage = this.messages.getString("dpu.ckan.starting", this.getClass().getSimpleName()) + " starting.";
+        String shortMessage = this.messages.getString("dpu.ckan.starting", this.getClass().getSimpleName());
         String longMessage = String.valueOf(this.config);
         this.context.sendMessage(DPUContext.MessageType.INFO, shortMessage, longMessage);
 
@@ -103,7 +112,8 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         try {
             tablesIteration = RelationalHelper.getTables(this.tablesInput).iterator();
         } catch (DataUnitException ex) {
-            this.context.sendMessage(DPUContext.MessageType.ERROR, this.messages.getString("errors.dpu.failed"), this.messages.getString("errors.tables.iterator"), ex);
+            this.context.sendMessage(DPUContext.MessageType.ERROR,
+                    this.messages.getString("errors.dpu.failed"), this.messages.getString("errors.tables.iterator"), ex);
             return;
         }
 
@@ -116,12 +126,16 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                 LOG.debug("Going to load table {} to CKAN dataset as resource", sourceTableName);
                 try {
                     if (existingResources.containsKey(sourceTableName)) {
-                        if (this.config.getOverWriteTables()) {
+                        if (this.config.isOverWriteTables()) {
                             LOG.info("Resource already exists, overwrite mode is enabled -> resource will be updated");
                             String resourceId = existingResources.get(sourceTableName);
                             updateCkanResource(entry, resourceId);
-                            createDatastoreFromTable(sourceTableName, resourceId);
+                            deleteCkanDatastore(resourceId);
+                            createDatastoreFromTable(entry, resourceId);
                             LOG.info("Resource and datastore for table {} successfully updated", sourceTableName);
+                            this.context.sendMessage(DPUContext.MessageType.WARNING,
+                                    this.messages.getString("dpu.resource.updated", sourceTableName));
+
                         } else {
                             LOG.info("Resource already exists, overwrite mode is disabled -> fail");
                             this.context.sendMessage(DPUContext.MessageType.WARNING,
@@ -132,32 +146,36 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                     } else {
                         LOG.info("Resource does not exist yet, it will be created");
                         String resourceId = createCkanResource(entry);
-                        createDatastoreFromTable(sourceTableName, resourceId);
+                        createDatastoreFromTable(entry, resourceId);
                         LOG.info("Resource and datastore for table {} successfully created", sourceTableName);
+                        this.context.sendMessage(DPUContext.MessageType.WARNING,
+                                this.messages.getString("dpu.resource.created", sourceTableName));
                     }
                 } catch (Exception e) {
+                    LOG.error("Failed to create resource / datastore for table {}", sourceTableName, e);
                     this.context.sendMessage(DPUContext.MessageType.ERROR,
-                            this.messages.getString("dpu.", "dpu.resource.upload"), sourceTableName);
+                            this.messages.getString("dpu.resource.upload", sourceTableName));
                 }
             }
         } catch (DataUnitException e) {
             throw new DPUException(this.messages.getString("errors.dpu.upload"), e);
         }
-
     }
 
-    private void createDatastoreFromTable(String sourceTableName, String resourceId) {
-        // TODO Auto-generated method stub
-
-    }
-
+    /**
+     * Get a map of existing resources for this pipeline. Key in this map is the name of the resource,
+     * in this case it is database table name. Value is resource ID - unique identifier of the resource, generated by CKAN
+     * 
+     * @return Map of existing resources from CKAN. Key is the name (table name), value is resource ID
+     * @throws DPUException
+     *             If error occurs obtaining resources from CKAN
+     */
     private Map<String, String> getExistingResources() throws DPUException {
         CloseableHttpClient client = HttpClients.createDefault();
         CloseableHttpResponse response = null;
         Map<String, String> existingResources = new HashMap<>();
         try {
-            URIBuilder uriBuilder;
-            uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
 
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
@@ -170,7 +188,8 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             httpPost.setEntity(entity);
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() != 200) {
-                throw new DPUException("Could not obtain Dataset entity from CKAN. Request: " + EntityUtils.toString(entity) + " Response:" + EntityUtils.toString(response.getEntity()));
+                throw new DPUException("Could not obtain Dataset entity from CKAN. Request: "
+                        + EntityUtils.toString(entity) + " Response:" + EntityUtils.toString(response.getEntity()));
             }
 
             JsonReaderFactory readerFactory = Json.createReaderFactory(Collections.<String, Object> emptyMap());
@@ -190,41 +209,16 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         return existingResources;
     }
 
-    private void updateCkanResource(RelationalDataUnit.Entry table, String resourceId) throws Exception {
-        JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
-        CloseableHttpClient client = HttpClients.createDefault();
-        CloseableHttpResponse response = null;
-        try {
-            String storageId = table.getTableName();
-            Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
-            resource.setName(storageId);
-            JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
-            resourceBuilder.add("id", resourceId);
-
-            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
-            uriBuilder.setPath(uriBuilder.getPath());
-            HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
-
-            MultipartEntityBuilder builder = buildCommonResourceParams(table, resourceBuilder);
-            builder.addTextBody(PROXY_API_ACTION, CKAN_API_RESOURCE_UPDATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
-
-            HttpEntity entity = builder.build();
-            httpPost.setEntity(entity);
-
-            response = client.execute(httpPost);
-            if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Response:" + EntityUtils.toString(response.getEntity()));
-            } else {
-                LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
-            }
-        } catch (ParseException | IOException | DataUnitException | URISyntaxException e) {
-            throw new Exception("Error exporting metadata", e);
-        } finally {
-            RelationalToCkanHelper.tryCloseHttpResponse(response);
-            RelationalToCkanHelper.tryCloseHttpClient(client);
-        }
-    }
-
+    /**
+     * Create CKAN resource from internal relational database table.
+     * This method should be called only in case resource for given table does not exist yet.
+     * 
+     * @param table
+     *            Internal input database table, from which the resource should be created
+     * @return Resource ID of the created resource
+     * @throws Exception
+     *             If problem occurs during creating of the resource
+     */
     private String createCkanResource(RelationalDataUnit.Entry table) throws Exception {
         String resourceId = null;
 
@@ -241,7 +235,8 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
 
-            MultipartEntityBuilder builder = buildCommonResourceParams(table, resourceBuilder);
+            MultipartEntityBuilder builder = buildCommonResourceParams(table);
+            builder.addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
             builder.addTextBody(PROXY_API_ACTION, CKAN_API_RESOURCE_CREATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
 
             HttpEntity entity = builder.build();
@@ -249,15 +244,19 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
 
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Response:" + EntityUtils.toString(response.getEntity()));
                 JsonReaderFactory readerFactory = Json.createReaderFactory(Collections.<String, Object> emptyMap());
                 JsonReader reader = readerFactory.createReader(response.getEntity().getContent());
-                resourceId = reader.readObject().getString("id");
+                JsonObject createdResource = reader.readObject();
+                if (!createdResource.containsKey("id")) {
+                    throw new Exception("Missing resource ID of the newly created CKAN resource");
+                }
+                resourceId = createdResource.getString("id");
             } else {
                 LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
+                throw new Exception("Failed to create CKAN resource");
             }
         } catch (ParseException | IOException | DataUnitException | URISyntaxException e) {
-            throw new Exception("Error exporting metadata", e);
+            throw new Exception("Failed to create CKAN resource", e);
         } finally {
             RelationalToCkanHelper.tryCloseHttpResponse(response);
             RelationalToCkanHelper.tryCloseHttpClient(client);
@@ -266,30 +265,204 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         return resourceId;
     }
 
-    private MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table, JsonObjectBuilder resourceBuilder) throws DataUnitException {
+    /**
+     * Update existing CKAN resource based on internal relational database table.
+     * This method should be called only in case resource for given already exists and its resource ID is known
+     * 
+     * @param table
+     *            Internal input database table, based on which the resource should be updated
+     * @return Resource ID of the created resource
+     * @throws Exception
+     *             If problem occurs during updating of the resource
+     */
+    private void updateCkanResource(RelationalDataUnit.Entry table, String resourceId) throws Exception {
+        JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
+        CloseableHttpClient client = HttpClients.createDefault();
+        CloseableHttpResponse response = null;
+        try {
+            String storageId = table.getTableName();
+            Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
+            resource.setName(storageId);
+            JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
+            resourceBuilder.add("id", resourceId);
+
+            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            uriBuilder.setPath(uriBuilder.getPath());
+            HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+
+            MultipartEntityBuilder builder = buildCommonResourceParams(table);
+            builder.addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
+            builder.addTextBody(PROXY_API_ACTION, CKAN_API_RESOURCE_UPDATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
+
+            HttpEntity entity = builder.build();
+            httpPost.setEntity(entity);
+
+            response = client.execute(httpPost);
+            if (response.getStatusLine().getStatusCode() == 200) {
+                LOG.info("Response:" + EntityUtils.toString(response.getEntity()));
+            } else {
+                LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
+                throw new Exception("Failed to update CKAN resource");
+            }
+        } catch (ParseException | IOException | DataUnitException | URISyntaxException e) {
+            throw new Exception("Error updating resource", e);
+        } finally {
+            RelationalToCkanHelper.tryCloseHttpResponse(response);
+            RelationalToCkanHelper.tryCloseHttpClient(client);
+        }
+    }
+
+    // TODO: maybe data should be split into several bulks if large data
+    // Otherwise we can have problems with memory / connection
+    /**
+     * Create CKAN datastore from input internal relational database table.
+     * It obtains all the information about columns, column types, primary keys and indexes.
+     * It creates the corresponding datastore definition and also sends all the data from the table
+     * 
+     * @param table
+     *            Input database table, from which the datastore should be created
+     * @param resourceId
+     *            CKAN resource ID
+     * @throws Exception
+     *             If error occurs during creating of the datastore definition or data upload
+     */
+    private void createDatastoreFromTable(RelationalDataUnit.Entry table, String resourceId) throws Exception {
+        Connection conn = null;
+        ResultSet tableData = null;
+        Statement stmnt = null;
+        CloseableHttpClient client = HttpClients.createDefault();
+        CloseableHttpResponse response = null;
+        String sourceTableName = table.getTableName();
+        try {
+
+            conn = this.tablesInput.getDatabaseConnection();
+            List<ColumnDefinition> columns = RelationalToCkanHelper.getColumnsForTable(conn, sourceTableName);
+            JsonArray fields = RelationalToCkanHelper.buildFieldsDefinitionJson(columns);
+
+            stmnt = conn.createStatement();
+            tableData = stmnt.executeQuery("SELECT * FROM " + sourceTableName);
+            JsonArray records = RelationalToCkanHelper.buildRecordsJson(tableData, columns);
+
+            List<String> indexes = RelationalToCkanHelper.getTableIndexes(conn, sourceTableName);
+            List<String> primaryKeys = RelationalToCkanHelper.getTablePrimaryKeys(conn, sourceTableName);
+            JsonObject dataStoreParams = RelationalToCkanHelper.buildCreateDataStoreParameters(resourceId, indexes, primaryKeys,
+                    fields, records);
+
+            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            uriBuilder.setPath(uriBuilder.getPath());
+            HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+
+            MultipartEntityBuilder builder = buildCommonResourceParams(table);
+            builder.addTextBody(PROXY_API_DATA, dataStoreParams.toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
+            builder.addTextBody(PROXY_API_ACTION, CKAN_API_DATASTORE_CREATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
+
+            HttpEntity entity = builder.build();
+            httpPost.setEntity(entity);
+
+            response = client.execute(httpPost);
+            if (response.getStatusLine().getStatusCode() == 200) {
+                LOG.info("Response:" + EntityUtils.toString(response.getEntity()));
+            } else {
+                LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
+                throw new Exception("Failed to create CKAN datastore");
+            }
+
+        } catch (DataUnitException | SQLException | URISyntaxException | IOException ex) {
+            throw new Exception("Failed to create CKAN datastore", ex);
+        } finally {
+            RelationalToCkanHelper.tryCloseDbResources(conn, stmnt, tableData);
+            RelationalToCkanHelper.tryCloseHttpResponse(response);
+            RelationalToCkanHelper.tryCloseHttpClient(client);
+        }
+    }
+
+    /**
+     * Deletes existing datastore belonging to the resource defined by provided resource ID
+     * 
+     * @param resourceId
+     *            CKAN resource ID
+     * @throws Exception
+     *             If error occurs
+     */
+    private void deleteCkanDatastore(String resourceId) throws Exception {
+        CloseableHttpClient client = HttpClients.createDefault();
+        CloseableHttpResponse response = null;
+        try {
+            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            uriBuilder.setPath(uriBuilder.getPath());
+
+            JsonObject deleteDataStoreParams = RelationalToCkanHelper.buildDeleteDataStoreParamters(resourceId);
+
+            HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+            HttpEntity entity = MultipartEntityBuilder.create()
+                    .addTextBody(PROXY_API_ACTION, CKAN_API_DATASTORE_DELETE, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(this.config.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_USER_ID, this.config.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_TOKEN, this.config.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_DATA, deleteDataStoreParams.toString(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .build();
+            httpPost.setEntity(entity);
+
+            response = client.execute(httpPost);
+            if (response.getStatusLine().getStatusCode() == 200) {
+                LOG.info("Response:" + EntityUtils.toString(response.getEntity()));
+            } else {
+                LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
+                throw new Exception("Failed to delete CKAN datastore");
+            }
+        } catch (ParseException | IOException | URISyntaxException e) {
+            throw new Exception("Failed to delete CKAN datastore", e);
+        } finally {
+            RelationalToCkanHelper.tryCloseHttpResponse(response);
+            RelationalToCkanHelper.tryCloseHttpClient(client);
+        }
+    }
+
+    /**
+     * Builds commom multipart parameters for resource API calls
+     * 
+     * @param table
+     *            Input database table name
+     * @return Common multi-part parameters
+     * @throws DataUnitException
+     *             If error occurs
+     */
+    private MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table) throws DataUnitException {
         String storageId = table.getTableName();
 
         MultipartEntityBuilder builder = MultipartEntityBuilder.create()
                 .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(this.config.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                 .addTextBody(PROXY_API_USER_ID, this.config.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                 .addTextBody(PROXY_API_TOKEN, this.config.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                .addTextBody(PROXY_API_STORAGE_ID, storageId, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                .addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
+                .addTextBody(PROXY_API_STORAGE_ID, storageId, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
 
         return builder;
     }
 
+    /**
+     * Create JSON object builder for resource
+     * 
+     * @param factory
+     *            JsonBuilderFactory to be used to create Json objects
+     * @param resource
+     *            Resource to create Json builder from
+     * @return JSON representation of provided resource
+     */
     private JsonObjectBuilder buildResource(JsonBuilderFactory factory, Resource resource) {
-        JsonObjectBuilder resourceExtrasBuilder = factory.createObjectBuilder();
-        for (Map.Entry<String, String> mapEntry : ResourceConverter.extrasToMap(resource.getExtras()).entrySet()) {
-            resourceExtrasBuilder.add(mapEntry.getKey(), mapEntry.getValue());
-        }
 
         JsonObjectBuilder resourceBuilder = factory.createObjectBuilder();
         for (Map.Entry<String, String> mapEntry : ResourceConverter.resourceToMap(resource).entrySet()) {
             resourceBuilder.add(mapEntry.getKey(), mapEntry.getValue());
         }
-        resourceBuilder.add("extras", resourceExtrasBuilder);
+
+        Map<String, String> extrasMap = ResourceConverter.extrasToMap(resource.getExtras());
+        if (extrasMap != null && !extrasMap.isEmpty()) {
+            JsonObjectBuilder resourceExtrasBuilder = factory.createObjectBuilder();
+            for (Map.Entry<String, String> mapEntry : extrasMap.entrySet()) {
+                resourceExtrasBuilder.add(mapEntry.getKey(), mapEntry.getValue());
+            }
+            resourceBuilder.add("extras", resourceExtrasBuilder);
+        }
 
         return resourceBuilder;
     }
