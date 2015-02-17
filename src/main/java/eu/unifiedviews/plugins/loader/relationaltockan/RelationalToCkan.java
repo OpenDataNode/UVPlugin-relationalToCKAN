@@ -49,7 +49,10 @@ import eu.unifiedviews.helpers.dpu.config.ConfigurableBase;
 import eu.unifiedviews.helpers.dpu.localization.Messages;
 
 /**
- * @author Tomas
+ * Loader of relational data into external CKAN catalog
+ * This DPU loads all input database tables into resources in dataset mapped in CKAN to pipeline ID
+ * By default, if resource with the same name exists, creating of the resource and datastore is skipped for this table.
+ * In overwrite mode, all resources are updated and datastore is deleted and created again
  */
 @DPU.AsLoader
 public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1> implements ConfigDialogProvider<RelationalToCkanConfig_V1> {
@@ -63,6 +66,10 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
     public static final String PROXY_API_USER_ID = "user_id";
 
     public static final String PROXY_API_TOKEN = "token";
+
+    public static final String CKAN_API_URL_TYPE = "url_type";
+
+    public static final String CKAN_API_URL_TYPE_DATASTORE = "datastore";
 
     public static final String CKAN_API_PACKAGE_SHOW = "package_show";
 
@@ -133,7 +140,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                             deleteCkanDatastore(resourceId);
                             createDatastoreFromTable(entry, resourceId);
                             LOG.info("Resource and datastore for table {} successfully updated", sourceTableName);
-                            this.context.sendMessage(DPUContext.MessageType.WARNING,
+                            this.context.sendMessage(DPUContext.MessageType.INFO,
                                     this.messages.getString("dpu.resource.updated", sourceTableName));
 
                         } else {
@@ -148,7 +155,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                         String resourceId = createCkanResource(entry);
                         createDatastoreFromTable(entry, resourceId);
                         LOG.info("Resource and datastore for table {} successfully created", sourceTableName);
-                        this.context.sendMessage(DPUContext.MessageType.WARNING,
+                        this.context.sendMessage(DPUContext.MessageType.INFO,
                                 this.messages.getString("dpu.resource.created", sourceTableName));
                     }
                 } catch (Exception e) {
@@ -184,18 +191,18 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                     .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(this.config.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_USER_ID, this.config.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_TOKEN, this.config.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_DATA, "{}", ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .build();
             httpPost.setEntity(entity);
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() != 200) {
-                throw new DPUException("Could not obtain Dataset entity from CKAN. Request: "
-                        + EntityUtils.toString(entity) + " Response:" + EntityUtils.toString(response.getEntity()));
+                throw new DPUException(this.messages.getString("dpu.resource.dataseterror", EntityUtils.toString(response.getEntity())));
             }
 
             JsonReaderFactory readerFactory = Json.createReaderFactory(Collections.<String, Object> emptyMap());
             JsonReader reader = readerFactory.createReader(response.getEntity().getContent());
             JsonObject dataset = reader.readObject();
-            JsonArray resources = dataset.getJsonArray("resources");
+            JsonArray resources = dataset.getJsonObject("result").getJsonArray("resources");
             for (JsonObject resource : resources.getValuesAs(JsonObject.class)) {
                 existingResources.put(resource.getString("name"), resource.getString("id"));
             }
@@ -246,7 +253,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             if (response.getStatusLine().getStatusCode() == 200) {
                 JsonReaderFactory readerFactory = Json.createReaderFactory(Collections.<String, Object> emptyMap());
                 JsonReader reader = readerFactory.createReader(response.getEntity().getContent());
-                JsonObject createdResource = reader.readObject();
+                JsonObject createdResource = reader.readObject().getJsonObject("result");
                 if (!createdResource.containsKey("id")) {
                     throw new Exception("Missing resource ID of the newly created CKAN resource");
                 }
@@ -360,13 +367,10 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             httpPost.setEntity(entity);
 
             response = client.execute(httpPost);
-            if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Response:" + EntityUtils.toString(response.getEntity()));
-            } else {
+            if (response.getStatusLine().getStatusCode() != 200) {
                 LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
                 throw new Exception("Failed to create CKAN datastore");
             }
-
         } catch (DataUnitException | SQLException | URISyntaxException | IOException ex) {
             throw new Exception("Failed to create CKAN datastore", ex);
         } finally {
@@ -463,6 +467,10 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             }
             resourceBuilder.add("extras", resourceExtrasBuilder);
         }
+
+        resourceBuilder.add(CKAN_API_URL_TYPE, CKAN_API_URL_TYPE_DATASTORE);
+        // just dummy URL, it will be overwritten in CKAN
+        resourceBuilder.add("url", "datastore");
 
         return resourceBuilder;
     }
