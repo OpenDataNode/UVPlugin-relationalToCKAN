@@ -95,6 +95,8 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
 
     public static final String CKAN_DATASTORE_INDEXES = "indexes";
 
+    public static final String SECRET_TOKEN = "secret_token";
+
     private Messages messages;
 
     private DPUContext context;
@@ -115,6 +117,26 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         String longMessage = String.valueOf(this.config);
         this.context.sendMessage(DPUContext.MessageType.INFO, shortMessage, longMessage);
 
+        // TODO: not implemented yet
+//        Map<String, String> environment = this.context.getEnvironment();
+//        long pipelineId = this.context.getPipelineId();
+//        String userId = this.context.getPipelineOwner();
+//        String token = environment.get(SECRET_TOKEN);
+//        if (token == null || token.isEmpty()) {
+//            throw new DPUException(this.messages.getString("errors.token.missing"));
+//        }
+//        String catalogApiLocation = environment.get("catalogApiLocation");
+//        if (catalogApiLocation != null || catalogApiLocation.isEmpty()) {
+//            throw new DPUException(this.messages.getString("errors.api.missing"));
+//        }
+
+        String catalogApiLocation = "http://edem.eea.sk:81/api/action/internal_api";
+        Long pipelineId = 3L;
+        String userId = "mvi";
+        String token = "secret_token";
+
+        CatalogApiConfig apiConfig = new CatalogApiConfig(catalogApiLocation, pipelineId, userId, token);
+
         Iterator<RelationalDataUnit.Entry> tablesIteration;
         try {
             tablesIteration = RelationalHelper.getTables(this.tablesInput).iterator();
@@ -124,7 +146,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             return;
         }
 
-        Map<String, String> existingResources = getExistingResources();
+        Map<String, String> existingResources = getExistingResources(apiConfig);
 
         try {
             while (!this.context.canceled() && tablesIteration.hasNext()) {
@@ -136,9 +158,9 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                         if (this.config.isOverWriteTables()) {
                             LOG.info("Resource already exists, overwrite mode is enabled -> resource will be updated");
                             String resourceId = existingResources.get(sourceTableName);
-                            updateCkanResource(entry, resourceId);
-                            deleteCkanDatastore(resourceId);
-                            createDatastoreFromTable(entry, resourceId);
+                            updateCkanResource(entry, resourceId, apiConfig);
+                            deleteCkanDatastore(resourceId, apiConfig);
+                            createDatastoreFromTable(entry, resourceId, apiConfig);
                             LOG.info("Resource and datastore for table {} successfully updated", sourceTableName);
                             this.context.sendMessage(DPUContext.MessageType.INFO,
                                     this.messages.getString("dpu.resource.updated", sourceTableName));
@@ -152,8 +174,8 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                         }
                     } else {
                         LOG.info("Resource does not exist yet, it will be created");
-                        String resourceId = createCkanResource(entry);
-                        createDatastoreFromTable(entry, resourceId);
+                        String resourceId = createCkanResource(entry, apiConfig);
+                        createDatastoreFromTable(entry, resourceId, apiConfig);
                         LOG.info("Resource and datastore for table {} successfully created", sourceTableName);
                         this.context.sendMessage(DPUContext.MessageType.INFO,
                                 this.messages.getString("dpu.resource.created", sourceTableName));
@@ -177,20 +199,20 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
      * @throws DPUException
      *             If error occurs obtaining resources from CKAN
      */
-    private Map<String, String> getExistingResources() throws DPUException {
+    private Map<String, String> getExistingResources(CatalogApiConfig apiConfig) throws DPUException {
         CloseableHttpClient client = HttpClients.createDefault();
         CloseableHttpResponse response = null;
         Map<String, String> existingResources = new HashMap<>();
         try {
-            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
 
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
             HttpEntity entity = MultipartEntityBuilder.create()
                     .addTextBody(PROXY_API_ACTION, CKAN_API_PACKAGE_SHOW, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(this.config.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_USER_ID, this.config.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_TOKEN, this.config.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_USER_ID, apiConfig.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_TOKEN, apiConfig.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_DATA, "{}", ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .build();
             httpPost.setEntity(entity);
@@ -226,7 +248,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
      * @throws Exception
      *             If problem occurs during creating of the resource
      */
-    private String createCkanResource(RelationalDataUnit.Entry table) throws Exception {
+    private String createCkanResource(RelationalDataUnit.Entry table, CatalogApiConfig apiConfig) throws Exception {
         String resourceId = null;
 
         JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
@@ -238,11 +260,11 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             resource.setName(storageId);
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
 
-            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
 
-            MultipartEntityBuilder builder = buildCommonResourceParams(table);
+            MultipartEntityBuilder builder = buildCommonResourceParams(table, apiConfig);
             builder.addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
             builder.addTextBody(PROXY_API_ACTION, CKAN_API_RESOURCE_CREATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
 
@@ -282,7 +304,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
      * @throws Exception
      *             If problem occurs during updating of the resource
      */
-    private void updateCkanResource(RelationalDataUnit.Entry table, String resourceId) throws Exception {
+    private void updateCkanResource(RelationalDataUnit.Entry table, String resourceId, CatalogApiConfig apiConfig) throws Exception {
         JsonBuilderFactory factory = Json.createBuilderFactory(Collections.<String, Object> emptyMap());
         CloseableHttpClient client = HttpClients.createDefault();
         CloseableHttpResponse response = null;
@@ -293,11 +315,11 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
             resourceBuilder.add("id", resourceId);
 
-            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
 
-            MultipartEntityBuilder builder = buildCommonResourceParams(table);
+            MultipartEntityBuilder builder = buildCommonResourceParams(table, apiConfig);
             builder.addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
             builder.addTextBody(PROXY_API_ACTION, CKAN_API_RESOURCE_UPDATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
 
@@ -333,7 +355,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
      * @throws Exception
      *             If error occurs during creating of the datastore definition or data upload
      */
-    private void createDatastoreFromTable(RelationalDataUnit.Entry table, String resourceId) throws Exception {
+    private void createDatastoreFromTable(RelationalDataUnit.Entry table, String resourceId, CatalogApiConfig apiConfig) throws Exception {
         Connection conn = null;
         ResultSet tableData = null;
         Statement stmnt = null;
@@ -355,11 +377,11 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             JsonObject dataStoreParams = RelationalToCkanHelper.buildCreateDataStoreParameters(resourceId, indexes, primaryKeys,
                     fields, records);
 
-            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
 
-            MultipartEntityBuilder builder = buildCommonResourceParams(table);
+            MultipartEntityBuilder builder = buildCommonResourceParams(table, apiConfig);
             builder.addTextBody(PROXY_API_DATA, dataStoreParams.toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
             builder.addTextBody(PROXY_API_ACTION, CKAN_API_DATASTORE_CREATE, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
 
@@ -388,11 +410,11 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
      * @throws Exception
      *             If error occurs
      */
-    private void deleteCkanDatastore(String resourceId) throws Exception {
+    private void deleteCkanDatastore(String resourceId, CatalogApiConfig apiConfig) throws Exception {
         CloseableHttpClient client = HttpClients.createDefault();
         CloseableHttpResponse response = null;
         try {
-            URIBuilder uriBuilder = new URIBuilder(this.config.getCatalogApiLocation());
+            URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
 
             JsonObject deleteDataStoreParams = RelationalToCkanHelper.buildDeleteDataStoreParamters(resourceId);
@@ -400,9 +422,9 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
             HttpEntity entity = MultipartEntityBuilder.create()
                     .addTextBody(PROXY_API_ACTION, CKAN_API_DATASTORE_DELETE, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(this.config.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_USER_ID, this.config.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_TOKEN, this.config.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_USER_ID, apiConfig.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_TOKEN, apiConfig.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_DATA, deleteDataStoreParams.toString(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .build();
             httpPost.setEntity(entity);
@@ -431,13 +453,13 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
      * @throws DataUnitException
      *             If error occurs
      */
-    private MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table) throws DataUnitException {
+    private MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table, CatalogApiConfig apiConfig) throws DataUnitException {
         String storageId = table.getTableName();
 
         MultipartEntityBuilder builder = MultipartEntityBuilder.create()
-                .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(this.config.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                .addTextBody(PROXY_API_USER_ID, this.config.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                .addTextBody(PROXY_API_TOKEN, this.config.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                .addTextBody(PROXY_API_USER_ID, apiConfig.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                .addTextBody(PROXY_API_TOKEN, apiConfig.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                 .addTextBody(PROXY_API_STORAGE_ID, storageId, ContentType.TEXT_PLAIN.withCharset("UTF-8"));
 
         return builder;
