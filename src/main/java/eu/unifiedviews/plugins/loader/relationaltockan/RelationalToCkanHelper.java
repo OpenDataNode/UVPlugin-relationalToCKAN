@@ -246,7 +246,7 @@ public class RelationalToCkanHelper {
                         break;
 
                     case Types.TIMESTAMP:
-                        entryBuilder.add(column.getColumnName(), rs.getTime(column.getColumnName()).toString());
+                        entryBuilder.add(column.getColumnName(), rs.getTimestamp(column.getColumnName()).toString());
                         break;
 
                     case Types.ARRAY:
