@@ -95,7 +95,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
 
     public static final String CKAN_DATASTORE_INDEXES = "indexes";
 
-    public static final String SECRET_TOKEN = "secret_token";
+    public static final String SECRET_TOKEN = "dpu.l-relationalToCkan.secret.token";
 
     private Messages messages;
 
@@ -124,7 +124,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         if (token == null || token.isEmpty()) {
             throw new DPUException(this.messages.getString("errors.token.missing"));
         }
-        String catalogApiLocation = environment.get("catalogApiLocation");
+        String catalogApiLocation = environment.get("dpu.l-relationalToCkan.catalog.api.location");
         if (catalogApiLocation == null || catalogApiLocation.isEmpty()) {
             throw new DPUException(this.messages.getString("errors.api.missing"));
         }
