@@ -124,7 +124,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         if (token == null || token.isEmpty()) {
             throw new DPUException(this.messages.getString("errors.token.missing"));
         }
-        String catalogApiLocation = environment.get("dpu.l-relationalToCkan.catalog.api.location");
+        String catalogApiLocation = environment.get("dpu.l-relationalToCkan.catalog.api.url");
         if (catalogApiLocation == null || catalogApiLocation.isEmpty()) {
             throw new DPUException(this.messages.getString("errors.api.missing"));
         }
