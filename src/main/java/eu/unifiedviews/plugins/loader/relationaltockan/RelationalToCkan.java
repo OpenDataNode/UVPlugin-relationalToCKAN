@@ -39,14 +39,13 @@ import eu.unifiedviews.dataunit.relational.RelationalDataUnit;
 import eu.unifiedviews.dpu.DPU;
 import eu.unifiedviews.dpu.DPUContext;
 import eu.unifiedviews.dpu.DPUException;
-import eu.unifiedviews.helpers.dataunit.relationalhelper.RelationalHelper;
-import eu.unifiedviews.helpers.dataunit.resourcehelper.Resource;
-import eu.unifiedviews.helpers.dataunit.resourcehelper.ResourceConverter;
-import eu.unifiedviews.helpers.dataunit.resourcehelper.ResourceHelpers;
-import eu.unifiedviews.helpers.dpu.config.AbstractConfigDialog;
-import eu.unifiedviews.helpers.dpu.config.ConfigDialogProvider;
-import eu.unifiedviews.helpers.dpu.config.ConfigurableBase;
-import eu.unifiedviews.helpers.dpu.localization.Messages;
+import eu.unifiedviews.helpers.dataunit.relational.RelationalHelper;
+import eu.unifiedviews.helpers.dataunit.resource.Resource;
+import eu.unifiedviews.helpers.dataunit.resource.ResourceConverter;
+import eu.unifiedviews.helpers.dataunit.resource.ResourceHelpers;
+import eu.unifiedviews.helpers.dpu.config.ConfigHistory;
+import eu.unifiedviews.helpers.dpu.context.ContextUtils;
+import eu.unifiedviews.helpers.dpu.exec.AbstractDpu;
 
 /**
  * Loader of relational data into external CKAN catalog
@@ -55,7 +54,7 @@ import eu.unifiedviews.helpers.dpu.localization.Messages;
  * In overwrite mode, all resources are updated and datastore is deleted and created again
  */
 @DPU.AsLoader
-public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1> implements ConfigDialogProvider<RelationalToCkanConfig_V1> {
+public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
     private static Logger LOG = LoggerFactory.getLogger(RelationalToCkan.class);
 
@@ -97,23 +96,19 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
 
     public static final String SECRET_TOKEN = "dpu.l-relationalToCkan.secret.token";
 
-    private Messages messages;
-
     private DPUContext context;
 
     @DataUnit.AsInput(name = "tablesInput")
     public RelationalDataUnit tablesInput;
 
     public RelationalToCkan() {
-        super(RelationalToCkanConfig_V1.class);
+        super(RelationalToCkanVaadinDialog.class, ConfigHistory.noHistory(RelationalToCkanConfig_V1.class));
     }
 
     @Override
-    public void execute(DPUContext context) throws DPUException, InterruptedException {
-        this.context = context;
-        this.messages = new Messages(this.context.getLocale(), this.getClass().getClassLoader());
+    protected void innerExecute() throws DPUException {
 
-        String shortMessage = this.messages.getString("dpu.ckan.starting", this.getClass().getSimpleName());
+        String shortMessage = this.ctx.tr("dpu.ckan.starting", this.getClass().getSimpleName());
         String longMessage = String.valueOf(this.config);
         this.context.sendMessage(DPUContext.MessageType.INFO, shortMessage, longMessage);
 
@@ -122,11 +117,11 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         String userId = this.context.getPipelineOwner();
         String token = environment.get(SECRET_TOKEN);
         if (token == null || token.isEmpty()) {
-            throw new DPUException(this.messages.getString("errors.token.missing"));
+            throw ContextUtils.dpuException(this.ctx, "errors.token.missing");
         }
         String catalogApiLocation = environment.get("dpu.l-relationalToCkan.catalog.api.url");
         if (catalogApiLocation == null || catalogApiLocation.isEmpty()) {
-            throw new DPUException(this.messages.getString("errors.api.missing"));
+            throw ContextUtils.dpuException(this.ctx, "errors.api.missing");
         }
 
         CatalogApiConfig apiConfig = new CatalogApiConfig(catalogApiLocation, pipelineId, userId, token);
@@ -135,8 +130,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         try {
             tablesIteration = RelationalHelper.getTables(this.tablesInput).iterator();
         } catch (DataUnitException ex) {
-            this.context.sendMessage(DPUContext.MessageType.ERROR,
-                    this.messages.getString("errors.dpu.failed"), this.messages.getString("errors.tables.iterator"), ex);
+            ContextUtils.sendError(this.ctx, "errors.dpu.failed", ex, "errors.tables.iterator");
             return;
         }
 
@@ -156,14 +150,13 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                             deleteCkanDatastore(resourceId, apiConfig);
                             createDatastoreFromTable(entry, resourceId, apiConfig);
                             LOG.info("Resource and datastore for table {} successfully updated", sourceTableName);
-                            this.context.sendMessage(DPUContext.MessageType.INFO,
-                                    this.messages.getString("dpu.resource.updated", sourceTableName));
+                            ContextUtils.sendShortInfo(this.ctx, "dpu.resource.updated", sourceTableName);
 
                         } else {
                             LOG.info("Resource already exists, overwrite mode is disabled -> fail");
                             this.context.sendMessage(DPUContext.MessageType.WARNING,
-                                    this.messages.getString("dpu.resource.skipped.short", sourceTableName),
-                                    this.messages.getString("dpu.resource.skipped.long"));
+                                    this.ctx.tr("dpu.resource.skipped.short", sourceTableName),
+                                    this.ctx.tr("dpu.resource.skipped.long"));
                             continue;
                         }
                     } else {
@@ -171,17 +164,16 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                         String resourceId = createCkanResource(entry, apiConfig);
                         createDatastoreFromTable(entry, resourceId, apiConfig);
                         LOG.info("Resource and datastore for table {} successfully created", sourceTableName);
-                        this.context.sendMessage(DPUContext.MessageType.INFO,
-                                this.messages.getString("dpu.resource.created", sourceTableName));
+                        ContextUtils.sendShortInfo(this.ctx, "dpu.resource.created", sourceTableName);
                     }
                 } catch (Exception e) {
                     LOG.error("Failed to create resource / datastore for table {}", sourceTableName, e);
                     this.context.sendMessage(DPUContext.MessageType.ERROR,
-                            this.messages.getString("dpu.resource.upload", sourceTableName));
+                            this.ctx.tr("dpu.resource.upload", sourceTableName));
                 }
             }
         } catch (DataUnitException e) {
-            throw new DPUException(this.messages.getString("errors.dpu.upload"), e);
+            throw ContextUtils.dpuException(this.ctx, e, "errors.dpu.upload");
         }
     }
 
@@ -212,7 +204,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             httpPost.setEntity(entity);
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() != 200) {
-                throw new DPUException(this.messages.getString("dpu.resource.dataseterror", EntityUtils.toString(response.getEntity())));
+                throw new DPUException(this.ctx.tr("dpu.resource.dataseterror", EntityUtils.toString(response.getEntity())));
             }
 
             JsonReaderFactory readerFactory = Json.createReaderFactory(Collections.<String, Object> emptyMap());
@@ -220,7 +212,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
             JsonObject responseJson = reader.readObject();
 
             if (!checkResponseSuccess(responseJson)) {
-                throw new DPUException(this.messages.getString("dpu.resource.responseerror"));
+                throw new DPUException(this.ctx.tr("dpu.resource.responseerror"));
             }
 
             JsonArray resources = responseJson.getJsonObject("result").getJsonArray("resources");
@@ -228,7 +220,7 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
                 existingResources.put(resource.getString("name"), resource.getString("id"));
             }
         } catch (ParseException | URISyntaxException | IllegalStateException | IOException ex) {
-            throw new DPUException(this.messages.getString("errors.dpu.dataset"), ex);
+            throw ContextUtils.dpuException(this.ctx, ex, "errors.dpu.dataset");
         } finally {
             RelationalToCkanHelper.tryCloseHttpResponse(response);
             RelationalToCkanHelper.tryCloseHttpClient(client);
@@ -510,11 +502,6 @@ public class RelationalToCkan extends ConfigurableBase<RelationalToCkanConfig_V1
         resourceBuilder.add("url", "datastore");
 
         return resourceBuilder;
-    }
-
-    @Override
-    public AbstractConfigDialog<RelationalToCkanConfig_V1> getConfigurationDialog() {
-        return new RelationalToCkanVaadinDialog();
     }
 
     private boolean checkResponseSuccess(JsonObject responseJson) throws IllegalStateException, IOException {

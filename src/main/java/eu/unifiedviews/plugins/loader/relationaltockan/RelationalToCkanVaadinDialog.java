@@ -5,40 +5,30 @@ import com.vaadin.ui.Panel;
 import com.vaadin.ui.VerticalLayout;
 
 import eu.unifiedviews.dpu.config.DPUConfigException;
-import eu.unifiedviews.helpers.dpu.config.BaseConfigDialog;
-import eu.unifiedviews.helpers.dpu.config.InitializableConfigDialog;
-import eu.unifiedviews.helpers.dpu.localization.Messages;
+import eu.unifiedviews.helpers.dpu.vaadin.dialog.AbstractDialog;
 
-public class RelationalToCkanVaadinDialog extends BaseConfigDialog<RelationalToCkanConfig_V1> implements InitializableConfigDialog {
+public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCkanConfig_V1> {
 
     private static final long serialVersionUID = 4097151848036185236L;
-
-    private Messages messages;
 
     private VerticalLayout mainLayout;
 
     private CheckBox chckOverWriteTables;
 
     public RelationalToCkanVaadinDialog() {
-        super(RelationalToCkanConfig_V1.class);
+        super(RelationalToCkan.class);
     }
 
     @Override
-    public void initialize() {
-        this.messages = new Messages(getContext().getLocale(), this.getClass().getClassLoader());
-
-        setWidth("100%");
-        setHeight("100%");
-
+    protected void buildDialogLayout() {
         this.mainLayout = new VerticalLayout();
-        this.mainLayout.setImmediate(false);
         this.mainLayout.setWidth("100%");
         this.mainLayout.setHeight("-1px");
         this.mainLayout.setSpacing(true);
         this.mainLayout.setMargin(false);
 
         this.chckOverWriteTables = new CheckBox();
-        this.chckOverWriteTables.setCaption(this.messages.getString("dialog.ckan.overwrite"));
+        this.chckOverWriteTables.setCaption(this.ctx.tr("dialog.ckan.overwrite"));
         this.mainLayout.addComponent(this.chckOverWriteTables);
 
         Panel panel = new Panel();
@@ -59,5 +49,4 @@ public class RelationalToCkanVaadinDialog extends BaseConfigDialog<RelationalToC
 
         return config;
     }
-
 }
