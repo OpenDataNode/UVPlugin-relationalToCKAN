@@ -107,7 +107,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
     @Override
     protected void innerExecute() throws DPUException {
-
+        this.context = this.ctx.getExecMasterContext().getDpuContext();
         String shortMessage = this.ctx.tr("dpu.ckan.starting", this.getClass().getSimpleName());
         String longMessage = String.valueOf(this.config);
         this.context.sendMessage(DPUContext.MessageType.INFO, shortMessage, longMessage);
