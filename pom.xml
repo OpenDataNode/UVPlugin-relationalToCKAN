@@ -7,6 +7,7 @@
     <relativePath/>
   </parent>
   
+  <groupId>eu.unifiedviews.plugins</groupId>
   <artifactId>uv-l-relationalToCkan</artifactId>
   <version>1.0.1-SNAPSHOT</version>
   <packaging>bundle</packaging>
