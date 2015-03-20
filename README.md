@@ -34,8 +34,7 @@
 
 |Version          |Release notes               |
 |-----------------|----------------------------|
-|1.0.0-SNAPSHOT   |N/A                         |
-|1.0.1-SNAPSHOT   |Update to new helpers       |
+|1.0.0            |First version               |
 
 
 ***

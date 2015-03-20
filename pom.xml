@@ -9,7 +9,7 @@
   
   <groupId>eu.unifiedviews.plugins</groupId>
   <artifactId>uv-l-relationalToCkan</artifactId>
-  <version>1.0.1-SNAPSHOT</version>
+  <version>1.0.0-SNAPSHOT</version>
   <packaging>bundle</packaging>
   <name>L-RelationalToCkan</name>
   <description>Loads relational data into CKAN datastore using CKAN API and thin proxy</description>
