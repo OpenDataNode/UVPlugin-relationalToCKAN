@@ -22,6 +22,16 @@
 
 ***
 
+###Global UnifiedViews configuration###
+In order to work properly, this DPU needs configuration parameters properly set in UV backend config.properties
+
+|Parameter                                       |Description                                                              |
+|------------------------------------------------|-------------------------------------------------------------------------|
+|dpu.uv-l-relationalToCkan.catalog.api.url   |URL of CKAN catalog with proper UV extension installed                   |
+|dpu.uv-l-relationalToCkan.secret.token      |Authentication token to CKAN                                             |
+
+***
+
 ### Inputs and outputs ###
 
 |Name          |Type           |DataUnit           |Description                                  |
