@@ -309,6 +309,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         try {
             String storageId = table.getTableName();
             Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
+            resource.setCreated(null);
             resource.setName(storageId);
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
             resourceBuilder.add("id", resourceId);
