@@ -8,7 +8,7 @@
 |**Name:**                     |L-RelationalToCkan                                                           |
 |**Description:**              |Uploads internal relational database tables into CKAN datastore              |
 |                              |                                                                             |
-|**DPU class name:**           |RelationalToCkan                                                             | 
+|**DPU class name:**           |RelationalToCkan                                                             |
 |**Configuration class name:** |RelationalToCkanConfig_V1                                                    |
 |**Dialogue class name:**      |RelationalToCkanVaadinDialog                                                 |
 
@@ -44,7 +44,8 @@ In order to work properly, this DPU needs configuration parameters properly set 
 
 |Version          |Release notes               |
 |-----------------|----------------------------|
-|1.0.0            |First version               |
+|1.0.1            | bug fixes and update in build dependencies |
+|1.0.0            | First version              |
 
 
 ***
@@ -53,4 +54,4 @@ In order to work properly, this DPU needs configuration parameters properly set 
 
 |Author           |Notes                           |
 |-----------------|--------------------------------|
-|N/A              |N/A                             | 
+|N/A              |N/A                             |
