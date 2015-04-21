@@ -94,7 +94,9 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
     public static final String CKAN_DATASTORE_INDEXES = "indexes";
 
-    public static final String SECRET_TOKEN = "dpu.l-relationalToCkan.secret.token";
+    public static final String SECRET_TOKEN = "dpu.uv-l-relationalToCkan.secret.token";
+
+    private static final String CONFIGURATION_CATALOG_API_LOCATION = "dpu.uv-l-relationalToCkan.catalog.api.url";
 
     private DPUContext context;
 
@@ -119,7 +121,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         if (token == null || token.isEmpty()) {
             throw ContextUtils.dpuException(this.ctx, "errors.token.missing");
         }
-        String catalogApiLocation = environment.get("dpu.l-relationalToCkan.catalog.api.url");
+        String catalogApiLocation = environment.get(CONFIGURATION_CATALOG_API_LOCATION);
         if (catalogApiLocation == null || catalogApiLocation.isEmpty()) {
             throw ContextUtils.dpuException(this.ctx, "errors.api.missing");
         }
@@ -307,6 +309,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         try {
             String storageId = table.getTableName();
             Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
+            resource.setCreated(null);
             resource.setName(storageId);
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
             resourceBuilder.add("id", resourceId);
@@ -490,11 +493,9 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
         Map<String, String> extrasMap = ResourceConverter.extrasToMap(resource.getExtras());
         if (extrasMap != null && !extrasMap.isEmpty()) {
-            JsonObjectBuilder resourceExtrasBuilder = factory.createObjectBuilder();
             for (Map.Entry<String, String> mapEntry : extrasMap.entrySet()) {
-                resourceExtrasBuilder.add(mapEntry.getKey(), mapEntry.getValue());
+                resourceBuilder.add(mapEntry.getKey(), mapEntry.getValue());
             }
-            resourceBuilder.add("extras", resourceExtrasBuilder);
         }
 
         resourceBuilder.add(CKAN_API_URL_TYPE, CKAN_API_URL_TYPE_DATASTORE);
