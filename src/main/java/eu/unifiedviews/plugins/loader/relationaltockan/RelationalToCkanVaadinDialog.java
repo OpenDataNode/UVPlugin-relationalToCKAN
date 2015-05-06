@@ -2,6 +2,7 @@ package eu.unifiedviews.plugins.loader.relationaltockan;
 
 import com.vaadin.ui.CheckBox;
 import com.vaadin.ui.Panel;
+import com.vaadin.ui.TextField;
 import com.vaadin.ui.VerticalLayout;
 
 import eu.unifiedviews.dpu.config.DPUConfigException;
@@ -14,6 +15,8 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
     private VerticalLayout mainLayout;
 
     private CheckBox chckOverWriteTables;
+    
+    private TextField txtResourceName;
 
     public RelationalToCkanVaadinDialog() {
         super(RelationalToCkan.class);
@@ -27,6 +30,13 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
         this.mainLayout.setSpacing(true);
         this.mainLayout.setMargin(false);
 
+        this.txtResourceName = new TextField();
+        this.txtResourceName.setNullRepresentation("");
+        this.txtResourceName.setRequired(true);
+        this.txtResourceName.setCaption(this.ctx.tr("dialog.ckan.resource.name"));
+        this.txtResourceName.setWidth("100%");
+        this.mainLayout.addComponent(this.txtResourceName);
+        
         this.chckOverWriteTables = new CheckBox();
         this.chckOverWriteTables.setCaption(this.ctx.tr("dialog.ckan.overwrite"));
         this.mainLayout.addComponent(this.chckOverWriteTables);
@@ -40,12 +50,18 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
     @Override
     protected void setConfiguration(RelationalToCkanConfig_V1 config) throws DPUConfigException {
         this.chckOverWriteTables.setValue(config.isOverWriteTables());
+        this.txtResourceName.setValue(config.getResourceName());
     }
 
     @Override
     protected RelationalToCkanConfig_V1 getConfiguration() throws DPUConfigException {
+        boolean isValid = this.txtResourceName.isValid();
+        if (!isValid) {
+            throw new DPUConfigException(ctx.tr("dialog.errors.params"));
+        }
         RelationalToCkanConfig_V1 config = new RelationalToCkanConfig_V1();
         config.setOverWriteTables(this.chckOverWriteTables.getValue());
+        config.setResourceName(this.txtResourceName.getValue());
 
         return config;
     }
