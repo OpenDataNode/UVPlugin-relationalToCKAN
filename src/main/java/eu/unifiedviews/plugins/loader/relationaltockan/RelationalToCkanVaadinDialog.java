@@ -15,7 +15,7 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
     private VerticalLayout mainLayout;
 
     private CheckBox chckOverWriteTables;
-    
+
     private TextField txtResourceName;
 
     public RelationalToCkanVaadinDialog() {
@@ -24,19 +24,23 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
 
     @Override
     protected void buildDialogLayout() {
+        setWidth("100%");
+        setHeight("100%");
+
         this.mainLayout = new VerticalLayout();
         this.mainLayout.setWidth("100%");
         this.mainLayout.setHeight("-1px");
         this.mainLayout.setSpacing(true);
-        this.mainLayout.setMargin(false);
+        this.mainLayout.setMargin(true);
 
         this.txtResourceName = new TextField();
         this.txtResourceName.setNullRepresentation("");
         this.txtResourceName.setRequired(true);
         this.txtResourceName.setCaption(this.ctx.tr("dialog.ckan.resource.name"));
         this.txtResourceName.setWidth("100%");
+        this.txtResourceName.setDescription(this.ctx.tr("dialog.resource.name.help"));
         this.mainLayout.addComponent(this.txtResourceName);
-        
+
         this.chckOverWriteTables = new CheckBox();
         this.chckOverWriteTables.setCaption(this.ctx.tr("dialog.ckan.overwrite"));
         this.mainLayout.addComponent(this.chckOverWriteTables);
