@@ -80,6 +80,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
     public static final String CKAN_API_DATASTORE_DELETE = "datastore_delete";
 
+    public static final String CKAN_API_ACTOR_ID = "actor_id";
+
     public static final String PROXY_API_STORAGE_ID = "storage_id";
 
     public static final String PROXY_API_DATA = "data";
@@ -116,7 +118,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
         Map<String, String> environment = this.context.getEnvironment();
         long pipelineId = this.context.getPipelineId();
-        String userId = this.context.getPipelineOwner();
+        String userId = (this.context.getPipelineExecutionOwnerExternalId() != null) ? this.context.getPipelineExecutionOwnerExternalId()
+                : this.context.getPipelineExecutionOwner();
         String token = environment.get(SECRET_TOKEN);
         if (token == null || token.isEmpty()) {
             throw ContextUtils.dpuException(this.ctx, "errors.token.missing");
@@ -420,7 +423,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
      * @throws Exception
      *             If error occurs
      */
-    private void deleteCkanDatastore(String resourceId, CatalogApiConfig apiConfig) throws Exception {
+    private static void deleteCkanDatastore(String resourceId, CatalogApiConfig apiConfig) throws Exception {
         CloseableHttpClient client = HttpClients.createDefault();
         CloseableHttpResponse response = null;
         try {
@@ -466,7 +469,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
      * @throws DataUnitException
      *             If error occurs
      */
-    private MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table, CatalogApiConfig apiConfig) throws DataUnitException {
+    private static MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table, CatalogApiConfig apiConfig) throws DataUnitException {
         String storageId = table.getTableName();
 
         MultipartEntityBuilder builder = MultipartEntityBuilder.create()
@@ -501,6 +504,9 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             }
         }
 
+        if (this.context.getPipelineExecutionActorExternalId() != null) {
+            resourceBuilder.add(CKAN_API_ACTOR_ID, this.context.getPipelineExecutionActorExternalId());
+        }
         resourceBuilder.add(CKAN_API_URL_TYPE, CKAN_API_URL_TYPE_DATASTORE);
         // just dummy URL, it will be overwritten in CKAN
         resourceBuilder.add("url", "datastore");
@@ -508,7 +514,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         return resourceBuilder;
     }
 
-    private boolean checkResponseSuccess(JsonObject responseJson) throws IllegalStateException, IOException {
+    private static boolean checkResponseSuccess(JsonObject responseJson) throws IllegalStateException, IOException {
         boolean bSuccess = responseJson.getBoolean("success");
 
         LOG.debug("CKAN success response value: {}", bSuccess);
@@ -520,7 +526,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         return bSuccess;
     }
 
-    private boolean checkResponseSuccess(CloseableHttpResponse response) throws IllegalStateException, IOException {
+    private static boolean checkResponseSuccess(CloseableHttpResponse response) throws IllegalStateException, IOException {
         JsonReaderFactory readerFactory = Json.createReaderFactory(Collections.<String, Object> emptyMap());
         JsonReader reader = readerFactory.createReader(response.getEntity().getContent());
         JsonObject responseJson = reader.readObject();
