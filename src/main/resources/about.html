@@ -3,9 +3,13 @@ to CKAN as CKAN datastore resource. Name of CKAN resource is the same as name of
 <p/>
 In order to work properly, these two parameters must be set in backend config.properties:
 <ul>
-	<li><b>dpu.uv-l-relationalToCkan.catalog.api.url</b> - URL of CKAN API</li>
-	<li><b>dpu.uv-l-relationalToCkan.secret.token</b> - authentication token for target CKAN</li>
+	<li><b>org.opendatanode.CKAN.api.url</b> - URL of CKAN API</li>
+	<li><b>org.opendatanode.CKAN.secret.token</b> - authentication token for target CKAN</li>
 </ul>
+<p/>
+Optional HTTP header parameters to be sent to CKAN can be defined in backend config.properties as:
+<br/><b>org.opendatanode.CKAN.http.header.[key]</b>
+<p/>
 <br/>
 Also, prior to running this DPU, an association between pipeline and CKAN dataset must exist, otherwise DPU fails 
   
