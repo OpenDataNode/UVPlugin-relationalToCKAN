@@ -105,12 +105,6 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
      */
     public static final String CONFIGURATION_DPU_CATALOG_API_LOCATION = "dpu.uv-l-relationalToCkan.catalog.api.url";
 
-    /**
-     * @deprecated Global configuration should be used {@link CONFIGURATION_HTTP_HEADER}
-     */
-    @Deprecated
-    public static final String CONFIGURATION_DPU_HTTP_HEADER = "dpu.uv-l-relationalToCkan.http.header.";
-
     public static final String CONFIGURATION_SECRET_TOKEN = "org.opendatanode.CKAN.secret.token";
 
     public static final String CONFIGURATION_CATALOG_API_LOCATION = "org.opendatanode.CKAN.api.url";
@@ -157,16 +151,6 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                 String headerName = configEntry.getKey().replace(CONFIGURATION_HTTP_HEADER, "");
                 String headerValue = configEntry.getValue();
                 additionalHttpHeaders.put(headerName, headerValue);
-            }
-        }
-        if (additionalHttpHeaders.isEmpty()) {
-            LOG.debug("Missing global configuration for additional HTTP headers, trying to use DPU specific configuration");
-            for (Map.Entry<String, String> configEntry : environment.entrySet()) {
-                if (configEntry.getKey().startsWith(CONFIGURATION_DPU_HTTP_HEADER)) {
-                    String headerName = configEntry.getKey().replace(CONFIGURATION_DPU_HTTP_HEADER, "");
-                    String headerValue = configEntry.getValue();
-                    additionalHttpHeaders.put(headerName, headerValue);
-                }
             }
         }
 
