@@ -105,9 +105,17 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
      */
     public static final String CONFIGURATION_DPU_CATALOG_API_LOCATION = "dpu.uv-l-relationalToCkan.catalog.api.url";
 
+    /**
+     * @deprecated Global configuration should be used {@link CONFIGURATION_HTTP_HEADER}
+     */
+    @Deprecated
+    public static final String CONFIGURATION_DPU_HTTP_HEADER = "dpu.uv-l-relationalToCkan.http.header.";
+
     public static final String CONFIGURATION_SECRET_TOKEN = "org.opendatanode.CKAN.secret.token";
 
     public static final String CONFIGURATION_CATALOG_API_LOCATION = "org.opendatanode.CKAN.api.url";
+
+    public static final String CONFIGURATION_HTTP_HEADER = "org.opendatanode.CKAN.http.header.";
 
     private DPUContext context;
 
@@ -143,7 +151,26 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             }
         }
 
-        CatalogApiConfig apiConfig = new CatalogApiConfig(catalogApiLocation, pipelineId, userId, token);
+        Map<String, String> additionalHttpHeaders = new HashMap<>();
+        for (Map.Entry<String, String> configEntry : environment.entrySet()) {
+            if (configEntry.getKey().startsWith(CONFIGURATION_HTTP_HEADER)) {
+                String headerName = configEntry.getKey().replace(CONFIGURATION_HTTP_HEADER, "");
+                String headerValue = configEntry.getValue();
+                additionalHttpHeaders.put(headerName, headerValue);
+            }
+        }
+        if (additionalHttpHeaders.isEmpty()) {
+            LOG.debug("Missing global configuration for additional HTTP headers, trying to use DPU specific configuration");
+            for (Map.Entry<String, String> configEntry : environment.entrySet()) {
+                if (configEntry.getKey().startsWith(CONFIGURATION_DPU_HTTP_HEADER)) {
+                    String headerName = configEntry.getKey().replace(CONFIGURATION_DPU_HTTP_HEADER, "");
+                    String headerValue = configEntry.getValue();
+                    additionalHttpHeaders.put(headerName, headerValue);
+                }
+            }
+        }
+
+        CatalogApiConfig apiConfig = new CatalogApiConfig(catalogApiLocation, pipelineId, userId, token, additionalHttpHeaders);
 
         Iterator<RelationalDataUnit.Entry> tablesIteration;
         try {
@@ -213,6 +240,10 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+            for (Map.Entry<String, String> additionalHeader : apiConfig.getAdditionalHttpHeaders().entrySet()) {
+                httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
+            }
+
             HttpEntity entity = MultipartEntityBuilder.create()
                     .addTextBody(PROXY_API_ACTION, CKAN_API_PACKAGE_SHOW, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
@@ -273,6 +304,9 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+            for (Map.Entry<String, String> additionalHeader : apiConfig.getAdditionalHttpHeaders().entrySet()) {
+                httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
+            }
 
             MultipartEntityBuilder builder = buildCommonResourceParams(table, apiConfig);
             builder.addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
@@ -334,6 +368,9 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+            for (Map.Entry<String, String> additionalHeader : apiConfig.getAdditionalHttpHeaders().entrySet()) {
+                httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
+            }
 
             MultipartEntityBuilder builder = buildCommonResourceParams(table, apiConfig);
             builder.addTextBody(PROXY_API_DATA, resourceBuilder.build().toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
@@ -399,6 +436,9 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
             uriBuilder.setPath(uriBuilder.getPath());
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+            for (Map.Entry<String, String> additionalHeader : apiConfig.getAdditionalHttpHeaders().entrySet()) {
+                httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
+            }
 
             MultipartEntityBuilder builder = buildCommonResourceParams(table, apiConfig);
             builder.addTextBody(PROXY_API_DATA, dataStoreParams.toString(), ContentType.APPLICATION_JSON.withCharset("UTF-8"));
@@ -444,6 +484,10 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             JsonObject deleteDataStoreParams = RelationalToCkanHelper.buildDeleteDataStoreParamters(resourceId);
 
             HttpPost httpPost = new HttpPost(uriBuilder.build().normalize());
+            for (Map.Entry<String, String> additionalHeader : apiConfig.getAdditionalHttpHeaders().entrySet()) {
+                httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
+            }
+
             HttpEntity entity = MultipartEntityBuilder.create()
                     .addTextBody(PROXY_API_ACTION, CKAN_API_DATASTORE_DELETE, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
