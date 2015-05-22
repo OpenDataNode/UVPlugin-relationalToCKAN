@@ -3,6 +3,12 @@ to CKAN as CKAN datastore resource. Name of CKAN resource is the same as name of
 <p/>
 In order to work properly, these two parameters must be set in backend config.properties:
 <ul>
+	<li><b>org.opendatanode.CKAN.api.url</b> - URL of CKAN API</li>
+	<li><b>org.opendatanode.CKAN.secret.token</b> - authentication token for target CKAN</li>
+</ul>
+<p/>
+Corresponding DPU specific parameters can be used, but these are deprecated and will soon be removed:
+<ul>
 	<li><b>dpu.uv-l-relationalToCkan.catalog.api.url</b> - URL of CKAN API</li>
 	<li><b>dpu.uv-l-relationalToCkan.secret.token</b> - authentication token for target CKAN</li>
 </ul>
