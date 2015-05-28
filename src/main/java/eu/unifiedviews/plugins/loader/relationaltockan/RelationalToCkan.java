@@ -418,8 +418,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             tableData = stmnt.executeQuery("SELECT * FROM " + sourceTableName);
             JsonArray records = RelationalToCkanHelper.buildRecordsJson(tableData, columns);
 
-            List<String> indexes = RelationalToCkanHelper.getTableIndexes(conn, sourceTableName);
             List<String> primaryKeys = RelationalToCkanHelper.getTablePrimaryKeys(conn, sourceTableName);
+            List<String> indexes = RelationalToCkanHelper.getTableIndexes(conn, sourceTableName, primaryKeys);
             JsonObject dataStoreParams = RelationalToCkanHelper.buildCreateDataStoreParameters(resourceId, indexes, primaryKeys,
                     fields, records);
 

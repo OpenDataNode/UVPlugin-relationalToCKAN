@@ -48,7 +48,7 @@ public class RelationalToCkanHelper {
         return columnDefinitions;
     }
 
-    public static List<String> getTableIndexes(Connection conn, String tableName) throws SQLException {
+    public static List<String> getTableIndexes(Connection conn, String tableName, List<String> primaryKeys) throws SQLException {
         List<String> columnIndexes = new ArrayList<>();
         ResultSet indexes = null;
         try {
@@ -56,8 +56,10 @@ public class RelationalToCkanHelper {
             indexes = meta.getIndexInfo(null, null, tableName, false, false);
             while (indexes.next()) {
                 String indexedColumn = indexes.getString("COLUMN_NAME");
-                if (indexedColumn != null) {
-                    columnIndexes.add(indexedColumn);
+                if (indexedColumn != null && !columnIndexes.contains(indexedColumn)) {
+                    if (!primaryKeys.contains(indexedColumn)) {
+                        columnIndexes.add(indexedColumn);
+                    }
                 }
             }
         } finally {
