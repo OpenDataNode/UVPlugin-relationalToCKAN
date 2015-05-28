@@ -232,7 +232,11 @@ public class RelationalToCkanHelper {
                     case Types.LONGNVARCHAR:
                     case Types.LONGVARCHAR:
                     case Types.CLOB:
-                        entryBuilder.add(column.getColumnName(), rs.getString(column.getColumnName()));
+                        if (rs.getString(column.getColumnName()) != null) {
+                            entryBuilder.add(column.getColumnName(), rs.getString(column.getColumnName()));
+                        } else {
+                            entryBuilder.addNull(column.getColumnName());
+                        }
                         break;
 
                     case Types.BOOLEAN:
