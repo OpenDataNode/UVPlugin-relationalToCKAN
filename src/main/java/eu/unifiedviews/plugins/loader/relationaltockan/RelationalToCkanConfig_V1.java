@@ -7,7 +7,7 @@ public class RelationalToCkanConfig_V1 {
 
     private boolean bOverwriteTables = false;
     
-    private String resourceName;
+    private String resourceName = "example name";
 
     public void setOverWriteTables(boolean overwrite) {
         this.bOverwriteTables = overwrite;
