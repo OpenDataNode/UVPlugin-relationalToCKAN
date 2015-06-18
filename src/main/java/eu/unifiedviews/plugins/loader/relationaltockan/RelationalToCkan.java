@@ -121,8 +121,6 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
     public static final String CONFIGURATION_HTTP_HEADER = "org.opendatanode.CKAN.http.header.";
 
-    public static final String CONFIGURATION_USE_EXTRAS = "org.opendatanode.CKAN.use.extras";
-
     private DPUContext context;
 
     @DataUnit.AsInput(name = "tablesInput")
