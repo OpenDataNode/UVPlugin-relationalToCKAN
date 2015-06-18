@@ -599,8 +599,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             resourceBuilder.add(CKAN_API_ACTOR_ID, this.context.getPipelineExecutionActorExternalId());
         }
         resourceBuilder.add(CKAN_API_URL_TYPE, CKAN_API_URL_TYPE_DATASTORE);
-        // just dummy URL, it will be overwritten in CKAN
-        resourceBuilder.add("url", "datastore");
+        // fix of CKAN issue - this URL must be present in CKAN v 2.3 in order to display data preview
+        resourceBuilder.add("url", "_datastore_only_resource");
 
         return resourceBuilder;
     }
