@@ -20,6 +20,7 @@ import javax.json.JsonObjectBuilder;
 import javax.json.JsonReader;
 import javax.json.JsonReaderFactory;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.ParseException;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -30,11 +31,14 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
+import org.openrdf.repository.RepositoryConnection;
+import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import eu.unifiedviews.dataunit.DataUnit;
 import eu.unifiedviews.dataunit.DataUnitException;
+import eu.unifiedviews.dataunit.rdf.RDFDataUnit;
 import eu.unifiedviews.dataunit.relational.RelationalDataUnit;
 import eu.unifiedviews.dpu.DPU;
 import eu.unifiedviews.dpu.DPUContext;
@@ -43,6 +47,7 @@ import eu.unifiedviews.helpers.dataunit.relational.RelationalHelper;
 import eu.unifiedviews.helpers.dataunit.resource.Resource;
 import eu.unifiedviews.helpers.dataunit.resource.ResourceConverter;
 import eu.unifiedviews.helpers.dataunit.resource.ResourceHelpers;
+import eu.unifiedviews.helpers.dataunit.resource.ResourceMerger;
 import eu.unifiedviews.helpers.dpu.config.ConfigHistory;
 import eu.unifiedviews.helpers.dpu.context.ContextUtils;
 import eu.unifiedviews.helpers.dpu.exec.AbstractDpu;
@@ -55,7 +60,8 @@ import eu.unifiedviews.helpers.dpu.exec.AbstractDpu;
  */
 @DPU.AsLoader
 public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
-
+    public static final String distributionSymbolicName = "distributionMetadata";
+    
     private static Logger LOG = LoggerFactory.getLogger(RelationalToCkan.class);
 
     public static final String PROXY_API_ACTION = "action";
@@ -118,6 +124,13 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
     @DataUnit.AsInput(name = "tablesInput")
     public RelationalDataUnit tablesInput;
 
+    @DataUnit.AsInput(name = "distributionInput", optional = true)
+    public RDFDataUnit distributionInput;
+
+    private Resource distributionFromRdfInput;
+    
+    private Boolean useExtras;
+
     public RelationalToCkan() {
         super(RelationalToCkanVaadinDialog.class, ConfigHistory.noHistory(RelationalToCkanConfig_V1.class));
     }
@@ -170,6 +183,19 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         if (internalTables.size() != 1) {
             LOG.error("DPU can process only one input database table; Actual count of tables: {}", internalTables.size());
             throw ContextUtils.dpuException(this.ctx, "errors.input.tables");
+        }
+
+        distributionFromRdfInput = null;
+        if (distributionInput != null) {
+            if (internalTables.size() != 1) {
+                throw ContextUtils.dpuException(this.ctx, "RelationalToCkan.execute.exception.tooManyFilesForOneDistribution");
+            }
+            RepositoryConnection con = null;
+            try {
+                distributionFromRdfInput = ResourceHelpers.getResource(distributionInput, distributionSymbolicName);
+            } catch (DataUnitException ex) {
+                throw ContextUtils.dpuException(this.ctx, "RelationalToCkan.execute.exception.dataunit");
+            }
         }
 
         Map<String, String> existingResources = getExistingResources(apiConfig);
@@ -288,6 +314,16 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         try {
             String resourceName = this.config.getResourceName();
             Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
+            if (distributionFromRdfInput != null) {
+                Resource mergedDistribution = ResourceMerger.merge(distributionFromRdfInput, resource);
+                resource = mergedDistribution;
+                if (StringUtils.isEmpty(resourceName)) {
+                    resourceName = resource.getName();
+                }
+            }
+            if (StringUtils.isEmpty(resourceName)) {
+                resourceName = table.getSymbolicName();
+            }
             resource.setName(resourceName);
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
 
@@ -350,8 +386,18 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         try {
             String resourceName = this.config.getResourceName();
             Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
-            resource.setCreated(null);
+            if (distributionFromRdfInput != null) {
+                Resource mergedDistribution = ResourceMerger.merge(distributionFromRdfInput, resource);
+                resource = mergedDistribution;
+                if (StringUtils.isEmpty(resourceName)) {
+                    resourceName = resource.getName();
+                }
+            }
+            if (StringUtils.isEmpty(resourceName)) {
+                resourceName = table.getSymbolicName();
+            }
             resource.setName(resourceName);
+            resource.setCreated(null);
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
             resourceBuilder.add("id", resourceId);
 
