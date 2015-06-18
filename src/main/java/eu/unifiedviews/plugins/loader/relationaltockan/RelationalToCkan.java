@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import eu.unifiedviews.dataunit.relational.RelationalDataUnit;
 import eu.unifiedviews.dpu.DPU;
 import eu.unifiedviews.dpu.DPUContext;
 import eu.unifiedviews.dpu.DPUException;
+import eu.unifiedviews.helpers.dataunit.rdf.RDFHelper;
 import eu.unifiedviews.helpers.dataunit.relational.RelationalHelper;
 import eu.unifiedviews.helpers.dataunit.resource.Resource;
 import eu.unifiedviews.helpers.dataunit.resource.ResourceConverter;
@@ -61,7 +63,7 @@ import eu.unifiedviews.helpers.dpu.exec.AbstractDpu;
 @DPU.AsLoader
 public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
     public static final String distributionSymbolicName = "distributionMetadata";
-    
+
     private static Logger LOG = LoggerFactory.getLogger(RelationalToCkan.class);
 
     public static final String PROXY_API_ACTION = "action";
@@ -119,6 +121,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
     public static final String CONFIGURATION_HTTP_HEADER = "org.opendatanode.CKAN.http.header.";
 
+    public static final String CONFIGURATION_USE_EXTRAS = "org.opendatanode.CKAN.use.extras";
+
     private DPUContext context;
 
     @DataUnit.AsInput(name = "tablesInput")
@@ -128,8 +132,6 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
     public RDFDataUnit distributionInput;
 
     private Resource distributionFromRdfInput;
-    
-    private Boolean useExtras;
 
     public RelationalToCkan() {
         super(RelationalToCkanVaadinDialog.class, ConfigHistory.noHistory(RelationalToCkanConfig_V1.class));
@@ -143,6 +145,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         this.context.sendMessage(DPUContext.MessageType.INFO, shortMessage, longMessage);
 
         Map<String, String> environment = this.context.getEnvironment();
+
         long pipelineId = this.context.getPipelineId();
         String userId = (this.context.getPipelineExecutionOwnerExternalId() != null) ? this.context.getPipelineExecutionOwnerExternalId()
                 : this.context.getPipelineExecutionOwner();
@@ -325,6 +328,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                 resourceName = table.getSymbolicName();
             }
             resource.setName(resourceName);
+
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
 
             URIBuilder uriBuilder = new URIBuilder(apiConfig.getCatalogApiLocation());
@@ -587,14 +591,12 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         for (Map.Entry<String, String> mapEntry : ResourceConverter.resourceToMap(resource).entrySet()) {
             resourceBuilder.add(mapEntry.getKey(), mapEntry.getValue());
         }
-
         Map<String, String> extrasMap = ResourceConverter.extrasToMap(resource.getExtras());
         if (extrasMap != null && !extrasMap.isEmpty()) {
             for (Map.Entry<String, String> mapEntry : extrasMap.entrySet()) {
                 resourceBuilder.add(mapEntry.getKey(), mapEntry.getValue());
             }
         }
-
         if (this.context.getPipelineExecutionActorExternalId() != null) {
             resourceBuilder.add(CKAN_API_ACTOR_ID, this.context.getPipelineExecutionActorExternalId());
         }
