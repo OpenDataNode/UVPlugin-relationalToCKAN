@@ -191,7 +191,6 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             if (internalTables.size() != 1) {
                 throw ContextUtils.dpuException(this.ctx, "RelationalToCkan.execute.exception.tooManyFilesForOneDistribution");
             }
-            RepositoryConnection con = null;
             try {
                 distributionFromRdfInput = ResourceHelpers.getResource(distributionInput, distributionSymbolicName);
             } catch (DataUnitException ex) {
