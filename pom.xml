@@ -15,7 +15,7 @@
 	<description>Loads relational data into CKAN datastore using CKAN API and thin proxy</description>
 
 	<properties>
-		<dpu.package>eu.unifiedviews.plugins.loader.relationaltockan</dpu.package>
+		<dpu.package>org.opendatanode.plugins.loader.relationaltockan</dpu.package>
 		<dpu.mainClass>RelationalToCkan</dpu.mainClass>
 		<mockito.version>1.10.8</mockito.version>
 		<powermock.version>1.6.1</powermock.version>

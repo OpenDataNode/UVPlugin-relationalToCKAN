@@ -1,4 +1,4 @@
-package eu.unifiedviews.plugins.loader.relationaltockan;
+package org.opendatanode.plugins.loader.relationaltockan;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -53,6 +53,7 @@ import eu.unifiedviews.helpers.dataunit.resource.ResourceMerger;
 import eu.unifiedviews.helpers.dpu.config.ConfigHistory;
 import eu.unifiedviews.helpers.dpu.context.ContextUtils;
 import eu.unifiedviews.helpers.dpu.exec.AbstractDpu;
+import eu.unifiedviews.plugins.loader.relationaltockan.RelationalToCkanConfig_V1;
 
 /**
  * Loader of relational data into external CKAN catalog

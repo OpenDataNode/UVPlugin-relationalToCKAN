@@ -1,4 +1,4 @@
-package eu.unifiedviews.plugins.loader.relationaltockan;
+package org.opendatanode.plugins.loader.relationaltockan;
 
 import com.vaadin.ui.CheckBox;
 import com.vaadin.ui.Panel;
@@ -7,6 +7,7 @@ import com.vaadin.ui.VerticalLayout;
 
 import eu.unifiedviews.dpu.config.DPUConfigException;
 import eu.unifiedviews.helpers.dpu.vaadin.dialog.AbstractDialog;
+import eu.unifiedviews.plugins.loader.relationaltockan.RelationalToCkanConfig_V1;
 
 public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCkanConfig_V1> {
 

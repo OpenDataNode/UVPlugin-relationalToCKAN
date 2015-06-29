@@ -1,4 +1,4 @@
-package eu.unifiedviews.plugins.loader.relationaltockan;
+package org.opendatanode.plugins.loader.relationaltockan;
 
 import java.io.IOException;
 import java.sql.Array;
