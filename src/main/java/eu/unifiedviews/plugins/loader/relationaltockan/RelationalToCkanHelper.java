@@ -4,9 +4,11 @@ import java.io.IOException;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,7 +50,7 @@ public class RelationalToCkanHelper {
         return columnDefinitions;
     }
 
-    public static List<String> getTableIndexes(Connection conn, String tableName) throws SQLException {
+    public static List<String> getTableIndexes(Connection conn, String tableName, List<String> primaryKeys) throws SQLException {
         List<String> columnIndexes = new ArrayList<>();
         ResultSet indexes = null;
         try {
@@ -56,8 +58,10 @@ public class RelationalToCkanHelper {
             indexes = meta.getIndexInfo(null, null, tableName, false, false);
             while (indexes.next()) {
                 String indexedColumn = indexes.getString("COLUMN_NAME");
-                if (indexedColumn != null) {
-                    columnIndexes.add(indexedColumn);
+                if (indexedColumn != null && !columnIndexes.contains(indexedColumn)) {
+                    if (!primaryKeys.contains(indexedColumn)) {
+                        columnIndexes.add(indexedColumn);
+                    }
                 }
             }
         } finally {
@@ -191,9 +195,10 @@ public class RelationalToCkanHelper {
         JsonArrayBuilder fieldsBuilder = factory.createArrayBuilder();
 
         for (ColumnDefinition column : columns) {
+            String columnTypeName = convertDataTypeForCkanIfNeeded(column.getColumnTypeName());
             fieldsBuilder.add(factory.createObjectBuilder()
                     .add("id", column.getColumnName())
-                    .add("type", column.getColumnTypeName()));
+                    .add("type", columnTypeName));
         }
 
         return fieldsBuilder.build();
@@ -228,7 +233,13 @@ public class RelationalToCkanHelper {
                     case Types.VARCHAR:
                     case Types.LONGNVARCHAR:
                     case Types.LONGVARCHAR:
-                        entryBuilder.add(column.getColumnName(), rs.getString(column.getColumnName()));
+                    case Types.CLOB:
+                        String stringValue = rs.getString(column.getColumnName());
+                        if (stringValue != null) {
+                            entryBuilder.add(column.getColumnName(), stringValue);
+                        } else {
+                            entryBuilder.addNull(column.getColumnName());
+                        }
                         break;
 
                     case Types.BOOLEAN:
@@ -242,11 +253,21 @@ public class RelationalToCkanHelper {
                         break;
 
                     case Types.DATE:
-                        entryBuilder.add(column.getColumnName(), rs.getDate(column.getColumnName()).toString());
+                        Date dateValue = rs.getDate(column.getColumnName());
+                        if (dateValue != null) {
+                            entryBuilder.add(column.getColumnName(), String.valueOf(dateValue));
+                        } else {
+                            entryBuilder.addNull(column.getColumnName());
+                        }
                         break;
 
                     case Types.TIMESTAMP:
-                        entryBuilder.add(column.getColumnName(), rs.getTimestamp(column.getColumnName()).toString());
+                        Timestamp timestampValue = rs.getTimestamp(column.getColumnName());
+                        if (timestampValue != null) {
+                            entryBuilder.add(column.getColumnName(), String.valueOf(timestampValue));
+                        } else {
+                            entryBuilder.addNull(column.getColumnName());
+                        }
                         break;
 
                     case Types.ARRAY:
@@ -254,8 +275,7 @@ public class RelationalToCkanHelper {
                         break;
 
                     case Types.BLOB:
-                    case Types.CLOB:
-                        // TODO: implement BLOB/CLOB conversion
+                        // TODO: implement BLOB conversion
                         entryBuilder.addNull(column.getColumnName());
                         break;
 
@@ -292,9 +312,44 @@ public class RelationalToCkanHelper {
         return jsonArray;
     }
 
-    public static void main(String[] args) {
-        String resourceId = "aaa-123-456";
-        System.out.println(buildDeleteDataStoreParamters(resourceId));
+    /**
+     * Mapping from H2 (used as internal dataunit database) types to PostgreSQL types (used in CKAN datastore)
+     * 
+     * @param dataTypeName
+     *            SQL type
+     * @return Converted SQL type if needed
+     */
+    private static String convertDataTypeForCkanIfNeeded(String dataTypeName) {
+        String convertedDataTypeName = dataTypeName;
+        switch (dataTypeName.toUpperCase()) {
+            case "CLOB":
+                convertedDataTypeName = "TEXT";
+                break;
+            case "TINYINT":
+                convertedDataTypeName = "SMALLINT";
+                break;
+            case "INT":
+                convertedDataTypeName = "INTEGER";
+                break;
+            case "DOUBLE":
+                convertedDataTypeName = "DOUBLE PRECISION";
+                break;
+            case "IDENTITY":
+                convertedDataTypeName = "BIGINT";
+                break;
+            case "BINARY":
+            case "BLOB":
+                convertedDataTypeName = "BYTEA";
+                break;
+            case "GEOMETRY":
+            case "VARCHAR_IGNORECASE":
+                convertedDataTypeName = "VARCHAR";
+                break;
+            case "ARRAY":
+                convertedDataTypeName = "VARCHAR ARRAY";
+                break;
+        }
 
+        return convertedDataTypeName;
     }
 }

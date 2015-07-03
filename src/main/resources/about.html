@@ -16,6 +16,8 @@ Also, prior to running this DPU, an association between pipeline and CKAN datase
 <p/>
 List of options:
 <ul>
+	<li><b>CKAN resource name</b> - (required) Name of resource to be created in CKAN. It should not change between pipeline runs as this name
+	is used as key to CKAN.
     <li><b>Overwrite existing resources</b> - (default false) if true and resource with the same name already exists in associated 
     dataset, it is overwritten. By default nothing happens if already exists, just warning message</li>
 </ul>
