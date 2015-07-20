@@ -6,7 +6,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -32,8 +31,6 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.openrdf.repository.RepositoryConnection;
-import org.openrdf.repository.RepositoryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +41,6 @@ import eu.unifiedviews.dataunit.relational.RelationalDataUnit;
 import eu.unifiedviews.dpu.DPU;
 import eu.unifiedviews.dpu.DPUContext;
 import eu.unifiedviews.dpu.DPUException;
-import eu.unifiedviews.helpers.dataunit.rdf.RDFHelper;
 import eu.unifiedviews.helpers.dataunit.relational.RelationalHelper;
 import eu.unifiedviews.helpers.dataunit.resource.Resource;
 import eu.unifiedviews.helpers.dataunit.resource.ResourceConverter;
@@ -90,6 +86,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
     public static final String CKAN_API_DATASTORE_DELETE = "datastore_delete";
 
     public static final String CKAN_API_ACTOR_ID = "actor_id";
+
+    public static final String CKAN_API_RESOURCE_CSV_TYPE = "CSV";
 
     public static final String PROXY_API_STORAGE_ID = "storage_id";
 
@@ -261,9 +259,11 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                 httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
             }
 
-            HttpEntity entity = MultipartEntityBuilder.create()
+            HttpEntity entity = MultipartEntityBuilder
+                    .create()
                     .addTextBody(PROXY_API_ACTION, CKAN_API_PACKAGE_SHOW, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()),
+                            ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_USER_ID, apiConfig.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_TOKEN, apiConfig.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_DATA, "{}", ContentType.TEXT_PLAIN.withCharset("UTF-8"))
@@ -326,6 +326,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                 resourceName = table.getSymbolicName();
             }
             resource.setName(resourceName);
+            resource.setFormat(CKAN_API_RESOURCE_CSV_TYPE);
 
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
 
@@ -400,6 +401,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             }
             resource.setName(resourceName);
             resource.setCreated(null);
+            resource.setFormat(CKAN_API_RESOURCE_CSV_TYPE);
             JsonObjectBuilder resourceBuilder = buildResource(factory, resource);
             resourceBuilder.add("id", resourceId);
 
@@ -526,9 +528,11 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                 httpPost.addHeader(additionalHeader.getKey(), additionalHeader.getValue());
             }
 
-            HttpEntity entity = MultipartEntityBuilder.create()
+            HttpEntity entity = MultipartEntityBuilder
+                    .create()
                     .addTextBody(PROXY_API_ACTION, CKAN_API_DATASTORE_DELETE, ContentType.TEXT_PLAIN.withCharset("UTF-8"))
-                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
+                    .addTextBody(PROXY_API_PIPELINE_ID, String.valueOf(apiConfig.getPipelineId()),
+                            ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_USER_ID, apiConfig.getUserId(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_TOKEN, apiConfig.getToken(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
                     .addTextBody(PROXY_API_DATA, deleteDataStoreParams.toString(), ContentType.TEXT_PLAIN.withCharset("UTF-8"))
@@ -562,7 +566,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
      * @throws DataUnitException
      *             If error occurs
      */
-    private static MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table, CatalogApiConfig apiConfig) throws DataUnitException {
+    private static MultipartEntityBuilder buildCommonResourceParams(RelationalDataUnit.Entry table, CatalogApiConfig apiConfig)
+            throws DataUnitException {
         String storageId = table.getTableName();
 
         MultipartEntityBuilder builder = MultipartEntityBuilder.create()
