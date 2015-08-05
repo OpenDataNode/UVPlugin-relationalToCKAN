@@ -6,8 +6,8 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 public class RelationalToCkanConfig_V1 {
 
     private boolean bOverwriteTables = false;
-    
-    private String resourceName = "example name";
+
+    private String resourceName = "";
 
     public void setOverWriteTables(boolean overwrite) {
         this.bOverwriteTables = overwrite;
@@ -23,11 +23,11 @@ public class RelationalToCkanConfig_V1 {
     }
 
     public String getResourceName() {
-        return resourceName;
+        return this.resourceName;
     }
 
     public void setResourceName(String resourceName) {
         this.resourceName = resourceName;
     }
-    
+
 }
