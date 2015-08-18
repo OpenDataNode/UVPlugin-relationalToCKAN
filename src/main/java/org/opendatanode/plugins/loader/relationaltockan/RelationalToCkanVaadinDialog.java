@@ -1,5 +1,6 @@
 package org.opendatanode.plugins.loader.relationaltockan;
 
+import com.vaadin.data.Validator;
 import com.vaadin.ui.CheckBox;
 import com.vaadin.ui.Panel;
 import com.vaadin.ui.TextField;
@@ -35,11 +36,11 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
         this.mainLayout.setMargin(true);
 
         this.txtResourceName = new TextField();
-        this.txtResourceName.setNullRepresentation("");
-        this.txtResourceName.setRequired(true);
         this.txtResourceName.setCaption(this.ctx.tr("dialog.ckan.resource.name"));
         this.txtResourceName.setWidth("100%");
         this.txtResourceName.setDescription(this.ctx.tr("dialog.resource.name.help"));
+        this.txtResourceName.addValidator(createResourceNameValidator());
+        this.txtResourceName.setInputPrompt(this.ctx.tr("dialog.resource.name.input"));
         this.mainLayout.addComponent(this.txtResourceName);
 
         this.chckOverWriteTables = new CheckBox();
@@ -52,6 +53,24 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
         setCompositionRoot(panel);
     }
 
+    private Validator createResourceNameValidator() {
+        Validator validator = new Validator() {
+
+            private static final long serialVersionUID = -186376062628005948L;
+
+            @SuppressWarnings("unqualified-field-access")
+            @Override
+            public void validate(Object value) throws InvalidValueException {
+                if (value == null || (value.getClass() == String.class && !((String) value).isEmpty())) {
+                    return;
+                }
+                throw new Validator.InvalidValueException(ctx.tr("dialog.errors.params"));
+            }
+        };
+
+        return validator;
+    }
+
     @Override
     protected void setConfiguration(RelationalToCkanConfig_V1 config) throws DPUConfigException {
         this.chckOverWriteTables.setValue(config.isOverWriteTables());
@@ -60,10 +79,7 @@ public class RelationalToCkanVaadinDialog extends AbstractDialog<RelationalToCka
 
     @Override
     protected RelationalToCkanConfig_V1 getConfiguration() throws DPUConfigException {
-        boolean isValid = this.txtResourceName.isValid();
-        if (!isValid) {
-            throw new DPUConfigException(ctx.tr("dialog.errors.params"));
-        }
+
         RelationalToCkanConfig_V1 config = new RelationalToCkanConfig_V1();
         config.setOverWriteTables(this.chckOverWriteTables.getValue());
         config.setResourceName(this.txtResourceName.getValue());
