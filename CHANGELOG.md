@@ -1,7 +1,12 @@
 L-RelationalToCkan
 ----------
 
-v1.1.2-SNAPSHOT
+v1.1.3
+---
+* Fixed documentation (About)
+* Update to API 2.1.2 (properly displayed about tab in UTF-8 encoding)
+
+v1.1.2
 ---
 * Improved description (About)
 
