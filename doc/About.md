@@ -14,4 +14,4 @@ Uploads internal relational database tables into CKAN datastore
 |Name |Type | DataUnit | Description | Mandatory |
 |:--------|:------:|:------:|:-------------|:---------------------:|
 |tablesInput       |i| RelationalDataUnit | Tables to be uploaded into CKAN datastore |x|
-|distributionInput |i| RDFDataUnit | Distribution metadata produced by e-distributionMetadata ||
+|distributionInput |i| RDFDataUnit | Distribution metadata produced by e-distributionMetadata | |
