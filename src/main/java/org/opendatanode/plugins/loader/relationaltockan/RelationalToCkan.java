@@ -193,7 +193,12 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                         LOG.info("Resource already exists, overwrite mode is enabled -> resource will be updated");
                         String resourceId = existingResources.get(resourceName);
                         updateCkanResource(entry, resourceId, apiConfig);
-                        deleteCkanDatastore(resourceId, apiConfig);
+                        try {
+                            deleteCkanDatastore(resourceId, apiConfig);
+                        } catch (Exception e) {
+                            ContextUtils.sendWarn(this.ctx, "dpu.datastore.delete.failed", "dpu.datastore.delete.failed.long");
+                        }
+
                         createDatastoreFromTable(entry, resourceId, apiConfig);
                         LOG.info("Resource and datastore {} for table {} successfully updated", resourceName, sourceTableName);
                         ContextUtils.sendShortInfo(this.ctx, "dpu.resource.updated", resourceName);
@@ -525,14 +530,16 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() == 200) {
                 if (!checkResponseSuccess(response)) {
+                    LOG.warn("Failed to delete CKAN datastore");
                     throw new Exception("Failed to delete CKAN datastore");
                 }
                 LOG.info("CKAN datastore successfully deleted");
             } else {
-                LOG.error("Response: {}", EntityUtils.toString(response.getEntity()));
+                LOG.warn("Failed to delete CKAN Datastore. Response: {}", EntityUtils.toString(response.getEntity()));
                 throw new Exception("Failed to delete CKAN datastore");
             }
         } catch (ParseException | IOException | URISyntaxException e) {
+            LOG.error("Failed to delete CKAN datastore", e);
             throw new Exception("Failed to delete CKAN datastore", e);
         } finally {
             RelationalToCkanHelper.tryCloseHttpResponse(response);
@@ -610,15 +617,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         JsonReader reader = readerFactory.createReader(response.getEntity().getContent());
         JsonObject responseJson = reader.readObject();
 
-        boolean bSuccess = responseJson.getBoolean("success");
-
-        LOG.debug("CKAN success response value: {}", bSuccess);
-        if (!bSuccess) {
-            String errorMessage = responseJson.getJsonObject("error").toString();
-            LOG.error("CKAN error response: {}", errorMessage);
-        }
-
-        return bSuccess;
+        return checkResponseSuccess(responseJson);
     }
 
     private static boolean isEmpty(String value) {

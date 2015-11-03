@@ -3,7 +3,7 @@ L-RelationalToCkan
 
 v1.1.6-SNAPSHOT
 ---
-N/A
+* Failed delete of datastore does not fail execution now, just raises warning
 
 v1.1.5-SNAPSHOT
 ---
