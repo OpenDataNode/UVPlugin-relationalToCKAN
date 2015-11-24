@@ -168,13 +168,13 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             throw ContextUtils.dpuException(this.ctx, "errors.input.tables");
         }
 
-        distributionFromRdfInput = null;
-        if (distributionInput != null) {
+        this.distributionFromRdfInput = null;
+        if (this.distributionInput != null) {
             if (internalTables.size() != 1) {
                 throw ContextUtils.dpuException(this.ctx, "RelationalToCkan.execute.exception.tooManyFilesForOneDistribution");
             }
             try {
-                distributionFromRdfInput = ResourceHelpers.getResource(distributionInput, distributionSymbolicName);
+                this.distributionFromRdfInput = ResourceHelpers.getResource(this.distributionInput, distributionSymbolicName);
             } catch (DataUnitException ex) {
                 throw ContextUtils.dpuException(this.ctx, "RelationalToCkan.execute.exception.dataunit");
             }
@@ -193,7 +193,12 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                         LOG.info("Resource already exists, overwrite mode is enabled -> resource will be updated");
                         String resourceId = existingResources.get(resourceName);
                         updateCkanResource(entry, resourceId, apiConfig);
-                        deleteCkanDatastore(resourceId, apiConfig);
+                        try {
+                            deleteCkanDatastore(resourceId, apiConfig);
+                        } catch (Exception e) {
+                            ContextUtils.sendWarn(this.ctx, "dpu.datastore.delete.failed", "dpu.datastore.delete.failed.long");
+                        }
+
                         createDatastoreFromTable(entry, resourceId, apiConfig);
                         LOG.info("Resource and datastore {} for table {} successfully updated", resourceName, sourceTableName);
                         ContextUtils.sendShortInfo(this.ctx, "dpu.resource.updated", resourceName);
@@ -298,8 +303,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         try {
             String resourceName = this.config.getResourceName();
             Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
-            if (distributionFromRdfInput != null) {
-                Resource mergedDistribution = ResourceMerger.merge(distributionFromRdfInput, resource);
+            if (this.distributionFromRdfInput != null) {
+                Resource mergedDistribution = ResourceMerger.merge(this.distributionFromRdfInput, resource);
                 resource = mergedDistribution;
                 if (StringUtils.isEmpty(resourceName)) {
                     resourceName = resource.getName();
@@ -334,19 +339,26 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
                 JsonObject responseJson = reader.readObject();
 
                 if (!checkResponseSuccess(responseJson)) {
-                    throw new Exception("Failed to create CKAN resource");
+                    String errorMsg = "Failed to create CKAN resource";
+                    LOG.error(errorMsg);
+                    throw new Exception(errorMsg);
                 }
 
                 if (!responseJson.getJsonObject("result").containsKey("id")) {
-                    throw new Exception("Missing resource ID of the newly created CKAN resource");
+                    String errorMsg = "Missing resource ID of the newly created CKAN resource";
+                    LOG.error(errorMsg);
+                    throw new Exception(errorMsg);
                 }
                 resourceId = responseJson.getJsonObject("result").getString("id");
             } else {
-                LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
-                throw new Exception("Failed to create CKAN resource");
+                String errorMsg = "Failed to create CKAN resource.";
+                LOG.error(errorMsg + " Response:" + EntityUtils.toString(response.getEntity()));
+                throw new Exception(errorMsg);
             }
         } catch (ParseException | IOException | DataUnitException | URISyntaxException e) {
-            throw new Exception("Failed to create CKAN resource", e);
+            String errorMsg = "Failed to create CKAN resource";
+            LOG.error(errorMsg, e);
+            throw new Exception(errorMsg, e);
         } finally {
             RelationalToCkanHelper.tryCloseHttpResponse(response);
             RelationalToCkanHelper.tryCloseHttpClient(client);
@@ -372,8 +384,8 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         try {
             String resourceName = this.config.getResourceName();
             Resource resource = ResourceHelpers.getResource(this.tablesInput, table.getSymbolicName());
-            if (distributionFromRdfInput != null) {
-                Resource mergedDistribution = ResourceMerger.merge(distributionFromRdfInput, resource);
+            if (this.distributionFromRdfInput != null) {
+                Resource mergedDistribution = ResourceMerger.merge(this.distributionFromRdfInput, resource);
                 resource = mergedDistribution;
                 if (StringUtils.isEmpty(resourceName)) {
                     resourceName = resource.getName();
@@ -405,15 +417,20 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() == 200) {
                 if (!checkResponseSuccess(response)) {
-                    throw new Exception("Failed to update CKAN resource");
+                    String errorMsg = "Failed to update CKAN resource";
+                    LOG.error(errorMsg);
+                    throw new Exception(errorMsg);
                 }
                 LOG.info("CKAN resource successfully updated");
             } else {
-                LOG.error("Response: {}", EntityUtils.toString(response.getEntity()));
-                throw new Exception("Failed to update CKAN resource");
+                String errorMsg = "Failed to update CKAN resource.";
+                LOG.error(errorMsg + " Response: {}", EntityUtils.toString(response.getEntity()));
+                throw new Exception(errorMsg);
             }
         } catch (ParseException | IOException | DataUnitException | URISyntaxException e) {
-            throw new Exception("Error updating resource", e);
+            String errorMsg = "Failed to update CKAN resource";
+            LOG.error(errorMsg, e);
+            throw new Exception(errorMsg, e);
         } finally {
             RelationalToCkanHelper.tryCloseHttpResponse(response);
             RelationalToCkanHelper.tryCloseHttpClient(client);
@@ -472,16 +489,21 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
 
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() != 200) {
-                LOG.error("Response:" + EntityUtils.toString(response.getEntity()));
-                throw new Exception("Failed to create CKAN datastore");
+                String errorMsg = "Failed to create CKAN datastore.";
+                LOG.error(errorMsg + " Response:" + EntityUtils.toString(response.getEntity()));
+                throw new Exception(errorMsg);
             }
 
             if (!checkResponseSuccess(response)) {
-                throw new Exception("Failed to create CKAN datastore");
+                String errorMsg = "Failed to create CKAN datastore";
+                LOG.error(errorMsg);
+                throw new Exception(errorMsg);
             }
 
         } catch (DataUnitException | SQLException | URISyntaxException | IOException ex) {
-            throw new Exception("Failed to create CKAN datastore", ex);
+            String errorMsg = "Failed to create CKAN datastore due to unexpected exception";
+            LOG.error(errorMsg, ex);
+            throw new Exception(errorMsg, ex);
         } finally {
             RelationalToCkanHelper.tryCloseDbResources(conn, stmnt, tableData);
             RelationalToCkanHelper.tryCloseHttpResponse(response);
@@ -525,14 +547,16 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
             response = client.execute(httpPost);
             if (response.getStatusLine().getStatusCode() == 200) {
                 if (!checkResponseSuccess(response)) {
+                    LOG.warn("Failed to delete CKAN datastore");
                     throw new Exception("Failed to delete CKAN datastore");
                 }
                 LOG.info("CKAN datastore successfully deleted");
             } else {
-                LOG.error("Response: {}", EntityUtils.toString(response.getEntity()));
+                LOG.warn("Failed to delete CKAN Datastore. Response: {}", EntityUtils.toString(response.getEntity()));
                 throw new Exception("Failed to delete CKAN datastore");
             }
         } catch (ParseException | IOException | URISyntaxException e) {
+            LOG.error("Failed to delete CKAN datastore", e);
             throw new Exception("Failed to delete CKAN datastore", e);
         } finally {
             RelationalToCkanHelper.tryCloseHttpResponse(response);
@@ -610,15 +634,7 @@ public class RelationalToCkan extends AbstractDpu<RelationalToCkanConfig_V1> {
         JsonReader reader = readerFactory.createReader(response.getEntity().getContent());
         JsonObject responseJson = reader.readObject();
 
-        boolean bSuccess = responseJson.getBoolean("success");
-
-        LOG.debug("CKAN success response value: {}", bSuccess);
-        if (!bSuccess) {
-            String errorMessage = responseJson.getJsonObject("error").toString();
-            LOG.error("CKAN error response: {}", errorMessage);
-        }
-
-        return bSuccess;
+        return checkResponseSuccess(responseJson);
     }
 
     private static boolean isEmpty(String value) {
