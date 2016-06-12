@@ -106,11 +106,20 @@ public class RelationalToCkanHelperTest {
         Mockito.when(rs.next()).thenReturn(true).thenReturn(true).thenReturn(false);
 
         Mockito.when(rs.getInt(COLUMN_1.getColumnName())).thenReturn(1).thenReturn(2);
+        Mockito.when(rs.getObject(COLUMN_1.getColumnName())).thenReturn(1).thenReturn(2);
+        
         Mockito.when(rs.getString(COLUMN_2.getColumnName())).thenReturn("Jim").thenReturn("John");
+        Mockito.when(rs.getObject(COLUMN_2.getColumnName())).thenReturn("Jim").thenReturn("John");
+        
         Mockito.when(rs.getString(COLUMN_3.getColumnName())).thenReturn("White").thenReturn("Black");
+        Mockito.when(rs.getObject(COLUMN_3.getColumnName())).thenReturn("White").thenReturn("Black");
         long utilDateTime = utilDate.getTime();
         Mockito.when(rs.getDate(COLUMN_4.getColumnName())).thenReturn(new Date(utilDateTime)).thenReturn(new Date(utilDateTime));
+        Mockito.when(rs.getObject(COLUMN_4.getColumnName())).thenReturn(new Date(utilDateTime)).thenReturn(new Date(utilDateTime));
+        
         Mockito.when(rs.getBoolean(COLUMN_5.getColumnName())).thenReturn(true).thenReturn(false);
+        Mockito.when(rs.getObject(COLUMN_5.getColumnName())).thenReturn(true).thenReturn(false);
+        
 
         return rs;
     }
