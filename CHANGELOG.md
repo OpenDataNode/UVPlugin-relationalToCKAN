@@ -3,7 +3,7 @@ L-RelationalToCkan
 
 v1.1.7-SNAPSHOT
 ---
-* N/A
+* Fixed null column values handling for all data types
 
 v1.1.6
 ---
