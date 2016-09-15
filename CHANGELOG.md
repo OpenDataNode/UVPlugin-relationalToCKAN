@@ -1,7 +1,7 @@
 L-RelationalToCkan
 ----------
 
-v1.1.7-SNAPSHOT
+v1.1.7
 ---
 * Fixed null column values handling for all data types
 
